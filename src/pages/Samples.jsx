@@ -92,8 +92,8 @@ export function Samples({ onOpenSample }) {
           <thead className="bg-gray-100">
             <tr>
               <th className="px-4 py-3 text-left">ID</th>
-              <th className="px-4 py-3 text-left">Sample Name</th>
               <th className="px-4 py-3 text-left">Product Name</th>
+              <th className="px-4 py-3 text-left">Sample Name</th>
               <th className="px-4 py-3 text-left">ADF</th>
               <th className="px-4 py-3 text-left">NDF</th>
               <th className="px-4 py-3 text-left">CP</th>
@@ -114,11 +114,11 @@ export function Samples({ onOpenSample }) {
                   </td>
 
                   <td className="px-4 py-2">
-                    {row.field_9063728 || `Sample ${row.id}`}
+                    {row.field_9063717 || '-'}
                   </td>
 
                   <td className="px-4 py-2">
-                    {row.field_9063717 || '-'}
+                    {row.field_9063728 || `Sample ${row.id}`}
                   </td>
 
                   <td className="px-4 py-2">
