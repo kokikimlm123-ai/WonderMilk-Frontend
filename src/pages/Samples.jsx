@@ -4,8 +4,10 @@ import { samplesAPI, dashboardAPI } from '../lib/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 
+const DEFAULT_FEED_TYPE = 'CORN SILAGE 16-06-2026';
+
 export function Samples({ onOpenSample }) {
-  const [selectedFeedType, setSelectedFeedType] = useState('');
+  const [selectedFeedType, setSelectedFeedType] = useState(DEFAULT_FEED_TYPE);
   const samplePageSize = selectedFeedType ? 200 : 50;
 
   const {
