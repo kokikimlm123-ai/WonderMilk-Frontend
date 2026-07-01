@@ -6,6 +6,7 @@ import { ErrorMessage } from '../components/ErrorMessage';
 
 export function Samples({ onOpenSample }) {
   const [selectedFeedType, setSelectedFeedType] = useState('');
+  const samplePageSize = selectedFeedType ? 200 : 50;
 
   const {
     data: samples,
@@ -13,8 +14,8 @@ export function Samples({ onOpenSample }) {
     error,
     refetch
   } = useApi(
-    () => samplesAPI.getAll(1, 50, selectedFeedType),
-    [selectedFeedType]
+    () => samplesAPI.getAll(1, samplePageSize, selectedFeedType),
+    [selectedFeedType, samplePageSize]
   );
 
   const { data: feedTypes } = useApi(
@@ -37,6 +38,9 @@ export function Samples({ onOpenSample }) {
 
   const results = samples?.results || [];
   const total = samples?.total || 0;
+  const showingText = selectedFeedType
+    ? `Showing ${results.length} of ${total} ${selectedFeedType} samples`
+    : `Showing ${results.length} of ${total} samples`;
 
   return (
     <div className="space-y-6">
@@ -48,6 +52,10 @@ export function Samples({ onOpenSample }) {
 
         <p className="text-gray-500 mt-1">
           Total: {total} samples
+        </p>
+
+        <p className="text-gray-500 mt-1">
+          {showingText}
         </p>
       </div>
 
@@ -82,6 +90,7 @@ export function Samples({ onOpenSample }) {
           <thead className="bg-gray-100">
             <tr>
               <th className="px-4 py-3 text-left">ID</th>
+              <th className="px-4 py-3 text-left">Sample Name</th>
               <th className="px-4 py-3 text-left">Product Name</th>
               <th className="px-4 py-3 text-left">ADF</th>
               <th className="px-4 py-3 text-left">NDF</th>
@@ -100,6 +109,10 @@ export function Samples({ onOpenSample }) {
                 >
                   <td className="px-4 py-2">
                     {row.id}
+                  </td>
+
+                  <td className="px-4 py-2">
+                    {row.field_9063728 || `Sample ${row.id}`}
                   </td>
 
                   <td className="px-4 py-2">
@@ -126,7 +139,7 @@ export function Samples({ onOpenSample }) {
             ) : (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="7"
                   className="px-4 py-6 text-center"
                 >
                   No data found
