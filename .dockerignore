@@ -1,0 +1,11 @@
+**
+!Dockerfile
+!services/
+!services/line-agent/
+!services/line-agent/package.json
+!services/line-agent/src/
+!services/line-agent/src/**
+!services/line-agent/scripts/
+!services/line-agent/scripts/**
+**/__pycache__/
+**/*.pyc
