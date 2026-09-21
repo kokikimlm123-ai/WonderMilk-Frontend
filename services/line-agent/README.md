@@ -4,7 +4,11 @@ Pilot backend for a single authorized LINE group, scoped to Farm 2, Farm 4, and 
 
 ## Deployment
 
-This branch adds the backend under `services/line-agent`. The repository-root Dockerfile builds only this service; the original frontend source is preserved. Deploy this branch with the root Dockerfile and `railway.json`. Use one replica and attach a persistent volume at `/data`. The service refuses activation on Railway without a volume mounted at its configured data directory.
+This branch adds the backend under `services/line-agent`. The repository-root Dockerfile builds only this service; the original frontend source is preserved. Deploy the `wonder-milk-line-agent` branch with the repository root as the build context and `Dockerfile` as the Dockerfile path. Do not deploy the frontend's `main` branch for this backend.
+
+Configure the Railway service directly: healthcheck path `/healthz`, healthcheck timeout 60 seconds, restart policy `ON_FAILURE` with five retries, and app sleeping disabled. Leave custom build/start commands unset so the Dockerfile entrypoint starts the service. Legacy `railway.json` / `railway.toml` configuration is deprecated and is not used here. See [Railway deployment configuration](https://docs.railway.com/infrastructure-as-code#migrating-from-config-as-code).
+
+Use one replica and attach a persistent volume at `/data`. The service refuses activation on Railway without a volume mounted at its configured data directory. Verify the deployment's commit and `/healthz` response before activating the bot.
 
 Keep `BOT_ENABLED=false` during setup. Configure the variables in `.env.example` using the hosting provider's private settings. No real credentials, group IDs, source file IDs, farm records, or submitted photos belong in this repository.
 
