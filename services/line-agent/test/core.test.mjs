@@ -72,9 +72,9 @@ test('worker clarifies uncertain OCR without writing, then accepts only the same
  const plans=[{action:'clarify',farms:['Farm 2'],question:'milk?',issues:['နို့ kg ပြောပါ'],records:[]},{action:'create',farms:['Farm 2'],question:'',issues:[],records:[example()]}];
  const ai={plan:async()=>plans.shift()},google={sync:async()=>store.db.prepare('UPDATE changes SET synced=1').run()},line={send:async()=>{}};
  const w=new Worker(c,store,google,ai,line);
- const evt=(id,user,text)=>({webhookEventId:id,type:'message',timestamp:Date.now(),source:{type:'group',groupId:'Cg',userId:user},message:{type:'text',text}});
+ const evt=(id,user,text)=>({webhookEventId:id,type:'message',timestamp:Date.now(),source:{type:'group',groupId:'Cg',userId:user},message:{type:'text',text,mention:{mentionees:[{isSelf:true}]}}});
  store.enqueue([evt('a','Uone','/add milk')]);await w.tick();assert.equal(store.records(['Farm 2']).length,0);
- store.enqueue([evt('b','Utwo','12.5 kg')]);await w.tick();assert.equal(plans.length,1);
+ const unrelated=evt('b','Utwo','12.5 kg');delete unrelated.message.mention;store.enqueue([unrelated]);await w.tick();assert.equal(plans.length,1);
  store.enqueue([evt('c','Uone','12.5 kg')]);await w.tick();assert.equal(store.records(['Farm 2']).length,1);
  assert.equal(store.draft('Cg:Uone'),null);
 });
@@ -100,11 +100,35 @@ test('read clarification retains original query, retrieves evidence without writ
    return {action:'ask',farms:['Farm 2'],type:'milk',cow_id:null,date_from:'2026-08-12',date_to:'2026-08-12',question:'Farm 2 milk total on 2026-08-12',issues:[],records:[]};
  },answer:async(q,e)=>{assert.match(q,/2026-08-12/);assert.equal(e.historical_sources[0].total,123);return '123 kg';}};
  const w=new Worker(c,store,{sources:async p=>{reads++;assert.equal(p.type,'milk');return [{total:123}];}},ai,{send:async()=>{}});
- async function send(id,text){store.enqueue([{webhookEventId:id,type:'message',timestamp:Date.now(),source:{type:'group',groupId:'Cg',userId:'Uone'},message:{type:'text',text}}]);await w.tick();}
+ async function send(id,text){store.enqueue([{webhookEventId:id,type:'message',timestamp:Date.now(),source:{type:'group',groupId:'Cg',userId:'Uone'},message:{type:'text',text,mention:{mentionees:[{isSelf:true}]}}}]);await w.tick();}
  await send('read1',query);
  await send('read2','2026-08-12');
  assert.equal(reads,1);assert.equal(store.records(['Farm 2']).length,0);
  store.saveDraft('Cg:Uone',{mode:'clarify',original_message:'stale mutation'});
  await send('read3','/ask Farm 2 milk total on 2026-08-12');
  assert.equal(reads,2);assert.equal(store.records(['Farm 2']).length,0);
+});
+test('unmentioned commands, clarification replies and photos stay silent; real mentions route by language',async t=>{
+ const {store,dir}=fixture(t),c={dir,group:'Cg',enabled:true,secret:'x',token:'x',aiKey:'x',googleJSON:'x',sheet:'test',sourceIds:{cows:'c',milkTests:'m',dailyExcel:'d'}};
+ let plans=0,photos=0;
+ const w=new Worker(c,store,{sources:async()=>[]},{plan:async(text,ctx)=>{
+ plans++;assert.equal(text,'Farm 2 milk total');assert.equal(ctx.language,'en');
+ return {action:'ask',farms:['Farm 2'],issues:[],records:[],question:text};
+ },answer:async(q,e,lang)=>{assert.equal(lang,'en');return 'No records';}},{image:async()=>{photos++;},send:async()=>{}});
+ async function send(id,message){store.enqueue([{webhookEventId:id,type:'message',timestamp:Date.now(),source:{type:'group',groupId:'Cg',userId:'Uone'},message}]);await w.tick();}
+ store.saveDraft('Cg:Uone',{mode:'clarify'});
+ await send('silent1',{type:'text',text:'/help'});
+ await send('silent2',{type:'text',text:'/farm Farm 2 milk'});
+ await send('silent3',{type:'text',text:'2026-08-12'});
+ await send('silent4',{type:'image',id:'123'});
+ assert.equal(plans,0);assert.equal(photos,0);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM outgoing').get().n,0);
+ await send('mention',{type:'text',text:'@Bot Farm 2 milk total',mention:{mentionees:[{isSelf:true,index:0,length:4}]}});
+ assert.equal(plans,1);
+});
+test('language detection supports Burmese, Thai and English',async()=>{
+ const {replyLanguage}=await import('../src/worker.mjs');
+ assert.equal(replyLanguage('Farm 2 နို့စုစုပေါင်း'),'my');
+ assert.equal(replyLanguage('Farm 2 น้ำนมทั้งหมด'),'th');
+ assert.equal(replyLanguage('Farm 2 milk total'),'en');
+ assert.equal(replyLanguage('2026-08-12','th'),'th');
 });

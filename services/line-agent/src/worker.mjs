@@ -8,13 +8,22 @@ import {RemoteError} from './integrations.mjs';
 export const HELP=`Wonder Milk Farm AI\nFarm 2 • Farm 4 • Ryokusan\nအဖွဲ့ဝင်အားလုံး မေး/သွင်း/ပြင်နိုင်ပါတယ်။\n\n/farm Farm 2 Cow 001 အချက်အလက်ပြပါ\n/farm Farm 4 2026-09-15 နေ့စုစုပေါင်းနို့ 850 kg စာရင်းသွင်းပါ\n/records Farm 4 — Bot စာရင်းနှင့် Record ID ရှာရန်\n/photo Farm 2 — နောက်ပို့မည့်ဖောင်၏ Farm သတ်မှတ်ရန်\nဖောင်ဓာတ်ပုံ ပို့နိုင်ပါတယ်။ မရှင်းလင်းသည့်အချက်ကို ပြန်မေးပါမယ်။\n/cancel — မပြီးသေးသောဖောင်ကို ရပ်ရန်\n\nမူလဖိုင်တွေကို ရှာဖတ်နိုင်ပြီး Bot ကသွင်းထားသောစာရင်းတွေကို ပြင်နိုင်ပါတယ်။ မူလဖိုင် row တွေကို တိုက်ရိုက်မပြင်သေးပါ။`;
 const photoName=(g,m)=>createHash('sha256').update(g+':'+m).digest('hex')+'.image';
 function farmIn(text){const t=text.trim().toLowerCase().replace(/\s+/g,' ');return FARMS.find(f=>t===f.toLowerCase()||t===(f==='Ryokusan'?'ryokusan farm':f.replace(' ', '').toLowerCase()));}
+export function replyLanguage(text,fallback='en'){
+ if(/[\u1000-\u109f]/.test(text))return 'my';
+ if(/[\u0e00-\u0e7f]/.test(text))return 'th';
+ return /[a-z]/i.test(text)?'en':fallback;
+}
 export class Worker {
   constructor(c,store,google,ai,line){Object.assign(this,{c,store,google,ai,line});this.running=false;this.lastSync=0;this.lastClean=0;}
   async process(job) {
     const e=JSON.parse(job.payload),group=e.source?.groupId,actor=`${group}:${e.source?.userId||''}`;
     if(e.source?.type!=='group'||!group){this.store.finish(job.id);return;}
     let bound=this.c.group||this.store.setting('group');
-    const text=e.message?.type==='text'?e.message.text||'':'';
+    const mention=e.message?.mention?.mentionees?.some(m=>m.isSelf===true);
+    let text=e.message?.type==='text'?e.message.text||'':'';
+    for(const m of [...(e.message?.mention?.mentionees||[])].filter(m=>m.isSelf===true).sort((a,b)=>b.index-a.index))
+      if(Number.isInteger(m.index)&&Number.isInteger(m.length))text=text.slice(0,m.index)+text.slice(m.index+m.length);
+    text=text.trim();
     if(!bound) {
       if(text.startsWith('/pair ')&&e.source.userId&&this.store.bind(group,text.slice(6).trim(),this.c.pairing)) {
         this.store.out(job.id,group,'Group ချိတ်ဆက်ပြီးပါပြီ။ Farm 2၊ Farm 4၊ Ryokusan ကို အသုံးပြုနိုင်ပါပြီ။ /help နဲ့ စမ်းပါ။');
@@ -36,13 +45,15 @@ export class Worker {
     }
     if(e.type!=='message'||!e.source.userId||this.store.setting('group_paused')==='true'){this.store.finish(job.id);return;}
     if(!['text','image'].includes(e.message.type)){this.store.finish(job.id);return;}
+    if(e.message.type==='text'&&!mention){this.store.finish(job.id);return;}
+    if(e.message.type==='image'&&!this.store.draft(actor)?.image_requested){this.store.finish(job.id);return;}
     if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.out(job.id,group,'စာပို့ပြီး အချိန်ကြာသွားလို့ အလိုအလျောက်မသိမ်းပါ။ ပြန်ပို့ပေးပါ။');this.store.finish(job.id);return;}
     if(text==='/help'||text==='/start'){this.store.out(job.id,group,HELP);this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
     if(text.startsWith('/photo ')) {
       const farm=farmIn(text.slice(7));
       if(!farm)throw new UserError('/photo Farm 2၊ /photo Farm 4 သို့မဟုတ် /photo Ryokusan ကိုသုံးပါ။');
-      this.store.saveDraft(actor,{mode:'photo',farm});
+      this.store.saveDraft(actor,{mode:'photo',farm,image_requested:true,language:replyLanguage(text)});
       this.store.out(job.id,group,`${farm} ဖောင်ဓာတ်ပုံကို 15 မိနစ်အတွင်း ပို့ပါ။`);this.store.finish(job.id);return;
     }
     if(text.startsWith('/records')) {
@@ -53,8 +64,6 @@ export class Worker {
       this.store.out(job.id,group,output?`${output}\n\nစုစုပေါင်း ${all.length} ခုထဲမှ ${Math.min(all.length,8)} ခု ပြထားပါတယ်။`:'Bot မှသွင်းထားသောစာရင်း မရှိသေးပါ။');this.store.finish(job.id);return;
     }
     const draft=/^\/(farm|ask|add|edit)\b/.test(text)?null:this.store.draft(actor);
-    const mention=e.message.mention?.mentionees?.some(m=>m.isSelf===true);
-    if(e.message.type==='text'&&!/^\/(farm|ask|add|edit)\b/.test(text)&&!mention&&draft?.mode!=='clarify'){this.store.finish(job.id);return;}
     if(missingConfiguration(this.c).length)throw new UserError('Bot ချိတ်ဆက်မှု မပြီးသေးပါ။ တာဝန်ရှိသူက configuration ကို စစ်ရန်လိုပါတယ်။');
     let image=null,nextDraft=draft||{};
     if(e.message.type==='image') {
@@ -63,14 +72,15 @@ export class Worker {
       if(this.store.setting(`photo:${hash}`))throw new UserError('ဒီဓာတ်ပုံကို သိမ်းပြီးသားပါ။ /records နဲ့ စစ်နိုင်ပါတယ်။');
       await mkdir(join(this.c.dir,'photos'),{recursive:true,mode:0o700});
       await writeFile(join(this.c.dir,'photos',file),image.bytes,{mode:0o600});
-      nextDraft={mode:'clarify',farm:draft?.farm||null,image_file:file,image_mime:image.mime,image_hash:hash,image_message_id:e.message.id};
+      nextDraft={mode:'clarify',image_requested:true,language:draft?.language||'en',farm:draft?.farm||null,image_file:file,image_mime:image.mime,image_hash:hash,image_message_id:e.message.id};
       this.store.saveDraft(actor,nextDraft);
     } else if(draft?.image_file) {
       if(!/^[a-f0-9]{64}\.image$/.test(draft.image_file))throw new Error('Invalid stored image path');
       try{image={bytes:await readFile(join(this.c.dir,'photos',draft.image_file)),mime:draft.image_mime};}
       catch{throw new UserError('ယခင်ဖောင်ဓာတ်ပုံ မရှိတော့ပါ။ ပုံကို ပြန်ပို့ပါ။');}
     }
-    const context={original_message:nextDraft.original_message||null,farm:nextDraft.farm||null,previous_question:nextDraft.question||null,previous_extraction:nextDraft.plan||null};
+    const language=replyLanguage(text,nextDraft.language);
+    const context={language,original_message:nextDraft.original_message||null,farm:nextDraft.farm||null,previous_question:nextDraft.question||null,previous_extraction:nextDraft.plan||null};
     const p=job.plan?JSON.parse(job.plan):await this.ai.plan(text||'Read this farm form and save its legible records.',context,image,this.store.records(FARMS).slice(0,30));
     this.store.db.prepare('UPDATE events SET plan=? WHERE id=?').run(JSON.stringify(p),job.id);
     if(p.action==='ignore'){this.store.clearDraft(actor);this.store.finish(job.id);return;}
@@ -78,12 +88,12 @@ export class Worker {
     if([p.date_from,p.date_to].some(d=>d!==null&&d!==undefined&&!validDate(d))||(p.date_from&&p.date_to&&p.date_from>p.date_to))throw new UserError('မေးမြန်းသည့် ရက်စွဲအပိုင်းကို YYYY-MM-DD ဖြင့် ပြန်ပေးပါ။');
     if(p.issues?.length||p.action==='clarify'||!p.farms.length) {
       const question=(p.issues?.length?p.issues.join('\n'):p.question)||'ဘယ် Farm အတွက်လဲ — Farm 2၊ Farm 4၊ Ryokusan?';
-      this.store.saveDraft(actor,{...nextDraft,mode:'clarify',original_message:nextDraft.original_message||text,plan:p,question});
+      this.store.saveDraft(actor,{...nextDraft,mode:'clarify',language,original_message:nextDraft.original_message||text,plan:p,question});
       this.store.out(job.id,group,question);this.store.finish(job.id);return;
     }
     if(p.action==='ask') {
       const evidence={historical_sources:await this.google.sources(p),agent_records:this.store.records(p.farms,p),note:'Agent records are a separate live intake register. Original historical sheets are not rewritten.'};
-      const answer=await this.ai.answer(p.question||text,evidence);
+      const answer=await this.ai.answer(p.question||text,evidence,language);
       this.store.out(job.id,group,answer);this.store.clearDraft(actor);
     } else if(['create','update'].includes(p.action)) {
       if(image&&p.action==='update'&&!/\/(edit|farm)\b/.test(text))throw new UserError('ပုံထဲရှိညွှန်ကြားချက်ဖြင့် မူလစာရင်း မပြင်ပါ။ ပြင်လိုသောစာရင်းကို စာဖြင့် ပြောပါ။');
