@@ -19,11 +19,14 @@ export class Worker {
     const e=JSON.parse(job.payload),group=e.source?.groupId,actor=`${group}:${e.source?.userId||''}`;
     if(e.source?.type!=='group'||!group){this.store.finish(job.id);return;}
     let bound=this.c.group||this.store.setting('group');
-    const mention=e.message?.mention?.mentionees?.some(m=>m.isSelf===true);
+    let mention=e.message?.mention?.mentionees?.some(m=>m.isSelf===true);
     let text=e.message?.type==='text'?e.message.text||'':'';
     for(const m of [...(e.message?.mention?.mentionees||[])].filter(m=>m.isSelf===true).sort((a,b)=>b.index-a.index))
       if(Number.isInteger(m.index)&&Number.isInteger(m.length))text=text.slice(0,m.index)+text.slice(m.index+m.length);
     text=text.trim();
+    const called=text.match(/^@(Wonder Milk Farm AI|WM)(?=\s|$)/i);
+    if(called){mention=true;text=text.slice(called[0].length).trim();}
+
     if(!bound) {
       if(text.startsWith('/pair ')&&e.source.userId&&this.store.bind(group,text.slice(6).trim(),this.c.pairing)) {
         this.store.out(job.id,group,'Group ချိတ်ဆက်ပြီးပါပြီ။ Farm 2၊ Farm 4၊ Ryokusan ကို အသုံးပြုနိုင်ပါပြီ။ /help နဲ့ စမ်းပါ။');

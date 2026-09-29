@@ -124,6 +124,12 @@ test('unmentioned commands, clarification replies and photos stay silent; real m
  assert.equal(plans,0);assert.equal(photos,0);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM outgoing').get().n,0);
  await send('mention',{type:'text',text:'@Bot Farm 2 milk total',mention:{mentionees:[{isSelf:true,index:0,length:4}]}});
  assert.equal(plans,1);
+ await send('typed-long',{type:'text',text:'@Wonder Milk Farm AI Farm 2 milk total'});
+ await send('typed-short',{type:'text',text:'@WM Farm 2 milk total'});
+ assert.equal(plans,3);
+ await send('not-prefix',{type:'text',text:'Tell @WM Farm 2 milk total'});
+ await send('other-name',{type:'text',text:'@WMarket Farm 2 milk total'});
+ assert.equal(plans,3);
 });
 test('language detection supports Burmese, Thai and English',async()=>{
  const {replyLanguage}=await import('../src/worker.mjs');
