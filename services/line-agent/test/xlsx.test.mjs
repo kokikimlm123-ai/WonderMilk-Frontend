@@ -23,4 +23,17 @@ w.save(sys.argv[1])`,path]);
  const milk=data.tables.find(t=>t.type==='milk'&&t.farm==='Farm 2');assert.equal(milk.matched_rows,1);assert.equal(milk.presented_rows[0].calf_kg,3);assert.equal(milk.presented_rows[0].discard_kg,2);assert.equal(milk.presented_rows[0].calculated_complete_total_kg,105);
  const f4=data.tables.find(t=>t.type==='milk'&&t.farm==='Farm 4');assert.equal(f4.presented_rows[0].calculated_complete_total_kg,undefined);assert.ok(f4.presented_rows[0].issues[0].includes('Missing'));
  assert.equal(data.tables.some(t=>t.farm==='Farm 1'),false);
+ // Some valid exporter-produced workbooks omit optional worksheet dimensions.
+ execFileSync('python3',['-c',`import sys,re,zipfile,os
+p=sys.argv[1]
+with zipfile.ZipFile(p) as src, zipfile.ZipFile(p+'.tmp','w') as dst:
+ for item in src.infolist():
+  b=src.read(item.filename)
+  if item.filename.startswith('xl/worksheets/'):
+   b=re.sub(rb'<dimension\\b[^>]*/>',b'',b)
+  dst.writestr(item,b)
+os.replace(p+'.tmp',p)
+`,path]);
+ const withoutDimensions=JSON.parse(execFileSync('python3',['scripts/read_xlsx.py',path,JSON.stringify(q)],{encoding:'utf8'}));
+ assert.deepEqual(withoutDimensions,data);
 });

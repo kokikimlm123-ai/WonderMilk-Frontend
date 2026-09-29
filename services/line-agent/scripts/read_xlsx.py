@@ -27,8 +27,8 @@ def read(path,query):
         if len(raw.worksheets)<=index: raise ValueError('Workbook sheet layout changed')
         ws,cs=raw.worksheets[index],cached.worksheets[index]
         # Materialize a bounded area once, avoiding repeated streaming seeks.
-        raw_rows=list(ws.iter_rows(min_row=1,max_row=min(ws.max_row,2200),max_col=65))
-        val_rows=list(cs.iter_rows(min_row=1,max_row=min(cs.max_row,2200),max_col=65))
+        raw_rows=list(ws.iter_rows(min_row=1,max_row=min(ws.max_row or 2200,2200),max_col=65))
+        val_rows=list(cs.iter_rows(min_row=1,max_row=min(cs.max_row or 2200,2200),max_col=65))
         for farm,columns in mappings.items():
             if farm not in query['farms']: continue
             lo=min(columns.values())-1;hi=max(columns.values())
