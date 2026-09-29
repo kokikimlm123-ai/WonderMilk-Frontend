@@ -88,3 +88,23 @@ test('Sheets sync uses RAW strings and refuses duplicate row IDs or stale overwr
  assert.equal(calls[0][1].valueInputOption,'RAW');assert.equal(calls[0][1].data[0].values[0][7],'=1+1');
  g.values=async()=>[['ID'],['rec'],['rec']];await assert.rejects(()=>g.upsertRow('Agent_Records','rec',['rec']));
 });
+test('read clarification retains original query, retrieves evidence without writes, and fresh commands reset context',async t=>{
+ const {store,dir}=fixture(t),c={dir,group:'Cg',enabled:true,secret:'x',token:'x',aiKey:'x',googleJSON:'x',sheet:'test',sourceIds:{cows:'c',milkTests:'m',dailyExcel:'d'}};
+ const query='/farm Farm 2 နို့စုစုပေါင်း kg ရှာပြပါ';
+ let calls=0,reads=0;
+ const ai={plan:async(text,context)=>{
+   calls++;
+   if(calls===1)return {action:'clarify',farms:['Farm 2'],question:'ဘယ်ရက်လဲ?',issues:[],records:[]};
+   if(calls===2)assert.equal(context.original_message,query);
+   if(calls===3)assert.equal(context.original_message,null);
+   return {action:'ask',farms:['Farm 2'],type:'milk',cow_id:null,date_from:'2026-08-12',date_to:'2026-08-12',question:'Farm 2 milk total on 2026-08-12',issues:[],records:[]};
+ },answer:async(q,e)=>{assert.match(q,/2026-08-12/);assert.equal(e.historical_sources[0].total,123);return '123 kg';}};
+ const w=new Worker(c,store,{sources:async p=>{reads++;assert.equal(p.type,'milk');return [{total:123}];}},ai,{send:async()=>{}});
+ async function send(id,text){store.enqueue([{webhookEventId:id,type:'message',timestamp:Date.now(),source:{type:'group',groupId:'Cg',userId:'Uone'},message:{type:'text',text}}]);await w.tick();}
+ await send('read1',query);
+ await send('read2','2026-08-12');
+ assert.equal(reads,1);assert.equal(store.records(['Farm 2']).length,0);
+ store.saveDraft('Cg:Uone',{mode:'clarify',original_message:'stale mutation'});
+ await send('read3','/ask Farm 2 milk total on 2026-08-12');
+ assert.equal(reads,2);assert.equal(store.records(['Farm 2']).length,0);
+});

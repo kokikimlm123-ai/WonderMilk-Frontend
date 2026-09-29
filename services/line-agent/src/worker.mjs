@@ -52,7 +52,7 @@ export class Worker {
       const output=all.slice(0,8).map(r=>`${r.farm} | ${r.type} | Cow ${r.cow_id||'farm/group'} | ${r.date||'profile'} | ${r.session||'daily/profile'}\nID: ${r.id} | v${r.version}\n${JSON.stringify(r.data)}`).join('\n\n');
       this.store.out(job.id,group,output?`${output}\n\nစုစုပေါင်း ${all.length} ခုထဲမှ ${Math.min(all.length,8)} ခု ပြထားပါတယ်။`:'Bot မှသွင်းထားသောစာရင်း မရှိသေးပါ။');this.store.finish(job.id);return;
     }
-    const draft=this.store.draft(actor);
+    const draft=/^\/(farm|ask|add|edit)\b/.test(text)?null:this.store.draft(actor);
     const mention=e.message.mention?.mentionees?.some(m=>m.isSelf===true);
     if(e.message.type==='text'&&!/^\/(farm|ask|add|edit)\b/.test(text)&&!mention&&draft?.mode!=='clarify'){this.store.finish(job.id);return;}
     if(missingConfiguration(this.c).length)throw new UserError('Bot ချိတ်ဆက်မှု မပြီးသေးပါ။ တာဝန်ရှိသူက configuration ကို စစ်ရန်လိုပါတယ်။');
@@ -70,7 +70,7 @@ export class Worker {
       try{image={bytes:await readFile(join(this.c.dir,'photos',draft.image_file)),mime:draft.image_mime};}
       catch{throw new UserError('ယခင်ဖောင်ဓာတ်ပုံ မရှိတော့ပါ။ ပုံကို ပြန်ပို့ပါ။');}
     }
-    const context={farm:nextDraft.farm||null,previous_question:nextDraft.question||null,previous_extraction:nextDraft.plan||null};
+    const context={original_message:nextDraft.original_message||null,farm:nextDraft.farm||null,previous_question:nextDraft.question||null,previous_extraction:nextDraft.plan||null};
     const p=job.plan?JSON.parse(job.plan):await this.ai.plan(text||'Read this farm form and save its legible records.',context,image,this.store.records(FARMS).slice(0,30));
     this.store.db.prepare('UPDATE events SET plan=? WHERE id=?').run(JSON.stringify(p),job.id);
     if(p.action==='ignore'){this.store.clearDraft(actor);this.store.finish(job.id);return;}
@@ -78,8 +78,8 @@ export class Worker {
     if([p.date_from,p.date_to].some(d=>d!==null&&d!==undefined&&!validDate(d))||(p.date_from&&p.date_to&&p.date_from>p.date_to))throw new UserError('မေးမြန်းသည့် ရက်စွဲအပိုင်းကို YYYY-MM-DD ဖြင့် ပြန်ပေးပါ။');
     if(p.issues?.length||p.action==='clarify'||!p.farms.length) {
       const question=(p.issues?.length?p.issues.join('\n'):p.question)||'ဘယ် Farm အတွက်လဲ — Farm 2၊ Farm 4၊ Ryokusan?';
-      this.store.saveDraft(actor,{...nextDraft,mode:'clarify',plan:p,question});
-      this.store.out(job.id,group,`အချက်အလက် မသိမ်းရသေးပါ။\n${question}`);this.store.finish(job.id);return;
+      this.store.saveDraft(actor,{...nextDraft,mode:'clarify',original_message:nextDraft.original_message||text,plan:p,question});
+      this.store.out(job.id,group,question);this.store.finish(job.id);return;
     }
     if(p.action==='ask') {
       const evidence={historical_sources:await this.google.sources(p),agent_records:this.store.records(p.farms,p),note:'Agent records are a separate live intake register. Original historical sheets are not rewritten.'};
