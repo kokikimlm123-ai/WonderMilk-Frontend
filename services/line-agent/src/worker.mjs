@@ -107,7 +107,7 @@ export class Worker {
       try {await this.google.sync(this.store);synced=this.store.db.prepare('SELECT COUNT(*) AS n FROM changes WHERE event=? AND synced=0').get(job.id).n===0;}catch{synced=false;}
       this.store.clearDraft(actor);
       const details=records.slice(0,10).map(r=>`${r.farm} | ${r.type} | Cow ${r.cow_id||'farm/group'} | ${r.date||'profile'}\nID: ${r.id} | v${r.version}`).join('\n');
-      this.store.out(job.id,group,`${records.length} ခု ${p.action==='update'?'ပြင်ဆင်':'သိမ်းဆည်း'}ပြီးပါပြီ။\n${details}\n${synced?'Google Sheets ထဲ သိမ်းပြီးပါပြီ။':'Server မှာသိမ်းထားပြီး Google Sheets သို့ ပို့ရန် စောင့်နေပါတယ်။'}\nhttps://docs.google.com/spreadsheets/d/${this.c.sheet}/edit`);
+      this.store.out(job.id,group,`${records.length} ခု ${p.action==='update'?'ပြင်ဆင်':'သိမ်းဆည်း'}ပြီးပါပြီ။\n${details}\n${synced?'Google Sheets ထဲ သိမ်းပြီးပါပြီ။':'Server မှာသိမ်းထားပြီး Google Sheets သို့ ပို့ရန် စောင့်နေပါတယ်။'}`);
     } else throw new UserError('လုပ်ဆောင်ချက်ကို ပြန်ရေးပေးပါ။');
     this.store.finish(job.id);
   }
