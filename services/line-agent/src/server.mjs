@@ -1,4 +1,4 @@
-import {validateIndex} from './cvas.mjs';
+import {validateIndex,answerCvas} from './cvas.mjs';
 import {privateLabEvent} from './lab-access.mjs';
 import {createServer} from 'node:http';
 import {pathToFileURL} from 'node:url';
@@ -44,7 +44,18 @@ export function createApp(c,store) {
 export function start() {
   process.umask(0o077);
   const c=configuration(),store=new Store(c.dir),google=new Google(c),worker=new Worker(c,store,google,new AI(c,store),new Line(c));
-  if(c.cvasIndex)google.cvasIndex().then(validateIndex).then(d=>console.log(JSON.stringify({cvas_source:"ready",reports:d.reports.length,private_access:true}))).catch(()=>console.error("cvas_source_unavailable"));
+  if(c.cvasIndex)google.cvasIndex().then(validateIndex) .then(async d=>{
+    console.log(JSON.stringify({cvas_source:"ready",reports:d.reports.length,private_access:true}));
+    if(!store.setting('cvas_smoke_v2')) {
+      store.set('cvas_smoke_v2','started');
+      try {
+        const answer=await answerCvas(d,'Show Lab ID 39170011 dry matter and starch.',new AI(c,store),'en');
+        const passed=answer.includes('40.2')&&/32(?:\.0)?/.test(answer);
+        store.set('cvas_smoke_v2',passed?'passed':'answer_review_needed');
+        console.log(JSON.stringify({cvas_smoke:passed?'passed':'answer_review_needed'}));
+      }catch(e){store.set('cvas_smoke_v2','failed');console.error(JSON.stringify({cvas_smoke:'failed',error_type:e.name,status:e.status,service:e.service,detail:e.name==='UserError'?e.message:undefined}));}
+    }
+  }).catch(()=>console.error("cvas_source_unavailable"));
   const server=createApp(c,store),timer=setInterval(()=>worker.tick().catch(()=>console.error('worker_error')),1000);
   server.listen(c.port,'0.0.0.0',()=>console.log(JSON.stringify({status:'listening',port:c.port,enabled:c.enabled,missing:missingConfiguration(c)})));
   const stop=()=>{clearInterval(timer);server.close();const end=setInterval(()=>{if(!worker.running){clearInterval(end);store.close();process.exit(0);}},100);setTimeout(()=>process.exit(1),55000).unref();};

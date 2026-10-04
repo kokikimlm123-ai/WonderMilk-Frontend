@@ -138,7 +138,8 @@ export class Worker {
         try{await this.process(job);}catch(e) {
           const event=JSON.parse(job.payload),bound=this.c.group||this.store.setting('group');
           if(event.source?.type==='user'&&labAllowed(this.c,this.store,event.source.userId)) {
-            this.store.out(job.id,event.source.userId,'CVAS request could not complete. Please specify a Lab ID or fewer reports and try again.');
+            console.error(JSON.stringify({lab_error:e.name,category:e instanceof UserError?'validation_or_limit':e instanceof RemoteError?'remote':'processing',service:e instanceof RemoteError?e.service:undefined,status:e instanceof RemoteError?e.status:undefined}));
+            this.store.out(job.id,event.source.userId,e instanceof UserError?e.message:e instanceof RemoteError?`CVAS connection error (${e.service}, ${e.status}). Please try again later.`:'CVAS request could not complete. Please specify a Lab ID or fewer reports and try again.');
           } else if(event.source?.groupId===bound) {
             const message=e instanceof UserError?e.message:e instanceof RemoteError?`ချိတ်ဆက်မှု မအောင်မြင်ပါ (${e.service}, ${e.status})။ စာရင်းအခြေအနေကို /records နဲ့ စစ်နိုင်ပါတယ်။`:'လုပ်ဆောင်မှု မပြီးဆုံးပါ။ /records နဲ့ စစ်ပြီး ပြန်ပို့ပါ။';
             this.store.out(job.id,bound,message);
