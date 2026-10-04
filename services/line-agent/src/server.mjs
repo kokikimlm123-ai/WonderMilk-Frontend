@@ -1,3 +1,5 @@
+import {validateIndex} from './cvas.mjs';
+import {privateLabEvent} from './lab-access.mjs';
 import {createServer} from 'node:http';
 import {pathToFileURL} from 'node:url';
 import {configuration,missingConfiguration} from './config.mjs';
@@ -28,9 +30,9 @@ export function createApp(c,store) {
       if(!body.events.length)return send(res,200,{ok:true});
       if(!c.enabled)return send(res,503,{error:'bot_paused'});
       const bound=c.group||store.setting('group');
-      const events=body.events.filter(e=>e?.source?.type==='group'&&(
+      const events=body.events.filter(e=>privateLabEvent(c,store,e)||(e?.source?.type==='group'&&(
         bound?e.source.groupId===bound:e.type==='message'&&e.source.userId&&e.message?.type==='text'&&e.message.text?.startsWith('/pair ')&&sameSecret(e.message.text.slice(6).trim(),c.pairing)
-      ));
+      )));
       const pending=store.db.prepare("SELECT COUNT(*) AS n FROM events WHERE status IN ('queued','processing')").get().n;
       if(pending+events.length>200)return send(res,503,{error:'queue_full'});
       store.enqueue(events);return send(res,200,{ok:true});
@@ -41,7 +43,8 @@ export function createApp(c,store) {
 }
 export function start() {
   process.umask(0o077);
-  const c=configuration(),store=new Store(c.dir),worker=new Worker(c,store,new Google(c),new AI(c,store),new Line(c));
+  const c=configuration(),store=new Store(c.dir),google=new Google(c),worker=new Worker(c,store,google,new AI(c,store),new Line(c));
+  if(c.cvasIndex)google.cvasIndex().then(validateIndex).then(d=>console.log(JSON.stringify({cvas_source:"ready",reports:d.reports.length,private_access:true}))).catch(()=>console.error("cvas_source_unavailable"));
   const server=createApp(c,store),timer=setInterval(()=>worker.tick().catch(()=>console.error('worker_error')),1000);
   server.listen(c.port,'0.0.0.0',()=>console.log(JSON.stringify({status:'listening',port:c.port,enabled:c.enabled,missing:missingConfiguration(c)})));
   const stop=()=>{clearInterval(timer);server.close();const end=setInterval(()=>{if(!worker.running){clearInterval(end);store.close();process.exit(0);}},100);setTimeout(()=>process.exit(1),55000).unref();};

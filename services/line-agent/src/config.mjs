@@ -13,6 +13,9 @@ export function configuration(e=process.env) {
     aiKey:e.OPENAI_API_KEY||'', model:e.OPENAI_MODEL||'gpt-5.4-mini',
     googleJSON:e.GOOGLE_SERVICE_ACCOUNT_JSON||'',
     sheet:e.AGENT_SPREADSHEET_ID||'',
+    cvasIndex:e.CVAS_INDEX_FILE_ID||'',
+    labPairHash:e.LAB_PAIR_SHA256||'', labPairExpires:Date.parse(e.LAB_PAIR_EXPIRES||''),
+    labAllowedUsers:(e.LAB_ALLOWED_USER_IDS||'').split(',').map(x=>x.trim()).filter(x=>/^U[0-9a-f]{32}$/i.test(x)),
     sourceIds:{cows:e.COW_SOURCE_SPREADSHEET_ID||'',milkTests:e.MILK_TEST_SOURCE_SPREADSHEET_ID||'',dailyExcel:e.DAILY_SOURCE_FILE_ID||'',ryokusan:e.RYOKUSAN_SOURCE_FILE_ID||''},
     maxCalls, volumeReady, enabled:e.BOT_ENABLED==='true', python:e.PYTHON_BIN||'python3',
   };

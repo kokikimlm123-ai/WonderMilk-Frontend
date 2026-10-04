@@ -1,3 +1,5 @@
+import {labAllowed,canPairLab} from './lab-access.mjs';
+import {cvasRequest,answerCvas} from './cvas.mjs';
 import {createHash} from 'node:crypto';
 import {mkdir,writeFile,readFile,unlink,readdir,stat} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -17,6 +19,20 @@ export class Worker {
   constructor(c,store,google,ai,line){Object.assign(this,{c,store,google,ai,line});this.running=false;this.lastSync=0;this.lastClean=0;}
   async process(job) {
     const e=JSON.parse(job.payload),group=e.source?.groupId,actor=`${group}:${e.source?.userId||''}`;
+    if(e.source?.type==='user') {
+      const user=e.source.userId;
+      if(canPairLab(this.c,this.store,e))this.store.set('lab_owner',user);
+      if(!labAllowed(this.c,this.store,user)||e.type!=='message'||e.message?.type!=='text'){this.store.finish(job.id);return;}
+      let request=(e.message.text||'').trim().replace(/^@(Wonder Milk Farm AI|WM)\s+/i,'');
+      if(/^\/lab-pair\b/i.test(request)||['/start','/help','/cvas'].includes(request)) {
+        this.store.out(job.id,user,'CVAS private access is ready. Only approved accounts can read lab reports. Ask here: /cvas Show Lab ID 39170011 dry matter and starch. Lab results are never posted to the group.');
+      } else {
+        if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.finish(job.id);return;}
+        const answer=await answerCvas(await this.google.cvasIndex(),request,this.ai,replyLanguage(request));
+        this.store.out(job.id,user,answer);
+      }
+      this.store.finish(job.id);return;
+    }
     if(e.source?.type!=='group'||!group){this.store.finish(job.id);return;}
     let bound=this.c.group||this.store.setting('group');
     let mention=e.message?.mention?.mentionees?.some(m=>m.isSelf===true);
@@ -53,6 +69,9 @@ export class Worker {
     if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.out(job.id,group,'စာပို့ပြီး အချိန်ကြာသွားလို့ အလိုအလျောက်မသိမ်းပါ။ ပြန်ပို့ပေးပါ။');this.store.finish(job.id);return;}
     if(text==='/help'||text==='/start'){this.store.out(job.id,group,HELP);this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
+    if(cvasRequest(text)) {
+      this.store.out(job.id,group,'CVAS lab reports are restricted to approved users in private chat. No lab results are shown in this group.');this.store.finish(job.id);return;
+    }
     if(text.startsWith('/photo ')) {
       const farm=farmIn(text.slice(7));
       if(!farm)throw new UserError('/photo Farm 2၊ /photo Farm 4 သို့မဟုတ် /photo Ryokusan ကိုသုံးပါ။');
@@ -118,7 +137,9 @@ export class Worker {
       if(job) {
         try{await this.process(job);}catch(e) {
           const event=JSON.parse(job.payload),bound=this.c.group||this.store.setting('group');
-          if(event.source?.groupId===bound) {
+          if(event.source?.type==='user'&&labAllowed(this.c,this.store,event.source.userId)) {
+            this.store.out(job.id,event.source.userId,'CVAS request could not complete. Please specify a Lab ID or fewer reports and try again.');
+          } else if(event.source?.groupId===bound) {
             const message=e instanceof UserError?e.message:e instanceof RemoteError?`ချိတ်ဆက်မှု မအောင်မြင်ပါ (${e.service}, ${e.status})။ စာရင်းအခြေအနေကို /records နဲ့ စစ်နိုင်ပါတယ်။`:'လုပ်ဆောင်မှု မပြီးဆုံးပါ။ /records နဲ့ စစ်ပြီး ပြန်ပို့ပါ။';
             this.store.out(job.id,bound,message);
           }
@@ -132,7 +153,8 @@ export class Worker {
       const outgoing=this.store.db.prepare("SELECT * FROM outgoing WHERE status='queued' AND next_attempt<=? ORDER BY created LIMIT 1").get(Date.now());
       if(outgoing&&this.c.token) {
         const bound=this.c.group||this.store.setting('group');
-        if(outgoing.group_id!==bound||this.store.setting('group_paused')==='true')this.store.db.prepare("UPDATE outgoing SET status='cancelled' WHERE id=?").run(outgoing.id);
+        const permitted=outgoing.group_id.startsWith('U')?labAllowed(this.c,this.store,outgoing.group_id):(outgoing.group_id===bound&&this.store.setting('group_paused')!=='true');
+        if(!permitted)this.store.db.prepare("UPDATE outgoing SET status='cancelled' WHERE id=?").run(outgoing.id);
         else {
           try{await this.line.send(outgoing.group_id,outgoing.text,outgoing.retry_key);this.store.db.prepare("UPDATE outgoing SET status='sent' WHERE id=?").run(outgoing.id);}
           catch(e){this.store.db.prepare("UPDATE outgoing SET attempts=attempts+1,next_attempt=?,status=CASE WHEN attempts>=9 OR created<? THEN 'failed' ELSE 'queued' END WHERE id=?").run(Date.now()+Math.min(300,2**outgoing.attempts)*1000,Date.now()-23*3600000,outgoing.id);}

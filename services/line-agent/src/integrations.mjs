@@ -85,6 +85,12 @@ export class Google {
       store.db.prepare('UPDATE changes SET synced=1 WHERE id=?').run(change.id);
     }
   }
+  async cvasIndex() {
+    if(!this.c.cvasIndex)throw new UserError('CVAS database is not connected yet.');
+    if(this.cvasCached && Date.now()-this.cvasCached.at<300000)return this.cvasCached.data;
+    const data=await json(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(this.c.cvasIndex)}?alt=media`,{headers:{authorization:`Bearer ${await this.token()}`}},8*1024*1024);
+    this.cvasCached={at:Date.now(),data};return data;
+  }
   async sources(plan) {
     const result=[];const wanted=plan.type;const SOURCE_IDS=this.c.sourceIds;
     if(plan.farms.includes('Ryokusan')&&SOURCE_IDS.ryokusan) {
@@ -199,7 +205,7 @@ export class Line {
     return {bytes,mime};
   }
   async send(group,text,retryKey) {
-    if(!/^C[A-Za-z0-9]+$/.test(group))throw new Error('Invalid LINE group ID');
+    if(!/^C[A-Za-z0-9]+$/.test(group)&&!/^U[0-9a-f]{32}$/i.test(group))throw new Error('Invalid LINE group ID');
     const res=await fetch('https://api.line.me/v2/bot/message/push',{method:'POST',signal:AbortSignal.timeout(15000),headers:{authorization:`Bearer ${this.c.token}`,'content-type':'application/json','X-Line-Retry-Key':retryKey},body:JSON.stringify({to:group,messages:[{type:'text',text:text.slice(0,4900)}]})});
     if(!res.ok&&res.status!==409)throw new RemoteError('LINE push',res.status);
   }
