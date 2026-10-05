@@ -10,6 +10,7 @@ export function validateIndex(data) {
 }
 export async function answerCvas(index,question,ai,language) {
  validateIndex(index);
+ if(/\bpdf\b/i.test(question))return originalPdfs(index,question,language);
  const exactIds=[...new Set(question.match(/\b\d{8}\b/g)||[])];
  if(exactIds.length) {
    const matched=index.reports.filter(r=>exactIds.includes(r.lab_id));
@@ -26,6 +27,22 @@ export async function answerCvas(index,question,ai,language) {
  return answerReports(index,question,[...new Set(selected.ids)].map(id=>index.reports[Number(id)]),ai,language);
 }
 async function answerReports(index,question,reports,ai,language) {
+ reports=reports.map(({original_pdf_url,...report})=>report);
  if(Buffer.byteLength(JSON.stringify(reports))>53000)return 'Please request fewer reports at once (one or two Lab IDs).';
  return ai.answer(question,{database:'CVAS lab reports (read-only)',indexed_on:index.indexed_on,source_files:index.file_count,distinct_pdf_contents:index.report_count,selected_report_count:reports.length,scope:'Only these selected reports are evidence. Do not rank the whole database. Preserve column alignment and distinguish %DM, %CP and %NDF. Blank values are missing, never zero. Attribute numeric values to Lab ID and filename. Different versions must not be merged. Text extraction does not preserve bold wet-chemistry formatting, so do not infer analytical method from font. Do not treat feed analysis as daily farm milk/feed production.',reports},language);
+}
+
+export function originalPdfs(index,question,language='en') {
+ const say=(en,my,th)=>({en,my,th}[language]||en);
+ const ids=[...new Set(question.match(/\b\d{8}\b/g)||[])];
+ if(!ids.length)return say('Please specify a Lab ID, for example: /cvas pdf 39170011','Lab ID ထည့်ပေးပါ။ ဥပမာ: /cvas pdf 39170011','กรุณาระบุ Lab ID เช่น /cvas pdf 39170011');
+ const reports=index.reports.filter(r=>ids.includes(r.lab_id));
+ const missing=ids.filter(id=>!reports.some(r=>r.lab_id===id));
+ if(missing.length)return say('Lab ID not found: ','Lab ID မတွေ့ပါ: ','ไม่พบ Lab ID: ')+missing.join(', ');
+ if(reports.length>4)return say('Please request at most four PDF versions at once.','တစ်ကြိမ်လျှင် PDF version လေးခုအထိသာ တောင်းပေးပါ။','กรุณาขอ PDF ไม่เกินสี่ฉบับต่อครั้ง');
+ const header=say('Original PDFs — open with your authorized Google account:','မူရင်း PDF — ခွင့်ပြုထားသော Google account ဖြင့် ဖွင့်ပါ:','PDF ต้นฉบับ — เปิดด้วยบัญชี Google ที่ได้รับอนุญาต:');
+ return header+'\n\n'+reports.map(r=>{
+  const url=typeof r.original_pdf_url==='string'&&/^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(r.original_pdf_url)?r.original_pdf_url:null;
+  return r.lab_id+' — '+r.filenames[0]+'\n'+(url||say('Original PDF access is not connected yet.','မူရင်း PDF access မချိတ်ဆက်ရသေးပါ။','ยังไม่ได้เชื่อมต่อสิทธิ์เข้าถึง PDF ต้นฉบับ'));
+ }).join('\n\n');
 }

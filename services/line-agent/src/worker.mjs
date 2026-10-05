@@ -25,7 +25,7 @@ export class Worker {
       if(!labAllowed(this.c,this.store,user)||e.type!=='message'||e.message?.type!=='text'){this.store.finish(job.id);return;}
       let request=(e.message.text||'').trim().replace(/^@(Wonder Milk Farm AI|WM)\s+/i,'');
       if(/^\/lab-pair\b/i.test(request)||['/start','/help','/cvas'].includes(request)) {
-        this.store.out(job.id,user,'CVAS private access is ready. Only approved accounts can read lab reports. Ask here: /cvas Show Lab ID 39170011 dry matter and starch. Lab results are never posted to the group.');
+        this.store.out(job.id,user,'CVAS private access is ready. Only approved accounts can read lab reports. Ask here: /cvas Show Lab ID 39170011 dry matter and starch. Members of the connected farm group can also request CVAS reports there using @WM /cvas.');
       } else {
         if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.finish(job.id);return;}
         const answer=await answerCvas(await this.google.cvasIndex(),request,this.ai,replyLanguage(request));
@@ -70,7 +70,8 @@ export class Worker {
     if(text==='/help'||text==='/start'){this.store.out(job.id,group,HELP);this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
     if(cvasRequest(text)) {
-      this.store.out(job.id,group,'CVAS lab reports are restricted to approved users in private chat. No lab results are shown in this group.');this.store.finish(job.id);return;
+      const answer=await answerCvas(await this.google.cvasIndex(),text,this.ai,replyLanguage(text));
+      this.store.out(job.id,group,answer);this.store.finish(job.id);return;
     }
     if(text.startsWith('/photo ')) {
       const farm=farmIn(text.slice(7));
