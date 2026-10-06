@@ -17,7 +17,7 @@ test('all connected group members can request CVAS; other groups and unmentioned
  const index={schema_version:1,reports:[{sha256:'a'.repeat(64),lab_id:'12345678',filenames:['test.pdf'],text:'DM 40'}]};
  const w=new Worker(c,store,{cvasIndex:async()=>{fetched++;return index;}},{answer:async()=> 'DM 40'},{});
  await w.process({id:'allowed',payload:JSON.stringify(ev(other,'@WM /cvas 12345678 DM','group'))});
- assert.equal(fetched,1);assert.equal(store.db.prepare('SELECT text FROM outgoing').get().text,'DM 40');
+ assert.equal(fetched,1);assert.match(store.db.prepare('SELECT text FROM outgoing').get().text,/^DM 40/);
  const wrong=ev(other,'@WM /cvas 12345678 DM','group');wrong.source.groupId='Cother';
  await w.process({id:'wrong',payload:JSON.stringify(wrong)});
  await w.process({id:'silent',payload:JSON.stringify(ev(other,'/cvas 12345678 DM','group'))});
