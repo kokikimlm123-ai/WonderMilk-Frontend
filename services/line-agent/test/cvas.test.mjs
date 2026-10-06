@@ -14,7 +14,7 @@ test('PDF requests use exact private catalog links without AI calls',async()=>{
 });
 test('ordinary answers do not receive original PDF URLs',async()=>{
  const data={...index,reports:[{...index.reports[0],original_pdf_url:'https://drive.google.com/file/d/test_file/view'}]};
- await answerCvas(data,'12345678 dry matter',{answer:async(q,e)=>{assert.equal(e.reports[0].original_pdf_url,undefined);return 'ok';}},'en');
+ const result=await answerCvas(data,'12345678 dry matter',{answer:async(q,e)=>{assert.equal(e.reports[0].original_pdf_url,undefined);return 'ok';}},'en');assert.match(result,/https:\/\/drive\.google\.com\/file\/d\/test_file\/view/);
 });
 test('CVAS routing does not capture normal farm questions',()=>{assert.equal(cvasRequest('/farm Farm 2 milk'),false);assert.equal(cvasRequest('/cvas Lab 12345678'),true);assert.equal(cvasRequest('CVAS report'),true);});
 test('Invalid index or duplicate report identity is rejected',()=>{assert.throws(()=>validateIndex({}));assert.throws(()=>validateIndex({...index,reports:[...index.reports,...index.reports]}));});
