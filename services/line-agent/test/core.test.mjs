@@ -138,3 +138,10 @@ test('language detection supports Burmese, Thai and English',async()=>{
  assert.equal(replyLanguage('Farm 2 milk total'),'en');
  assert.equal(replyLanguage('2026-08-12','th'),'th');
 });
+
+test('long PDF lists queue every link once across LINE messages',t=>{
+ const {store}=fixture(t);const text=Array.from({length:66},(_,i)=>`Lab ${i}\nhttps://drive.google.com/file/d/${'a'.repeat(80)}${i}/view\n`).join('\n');
+ store.out('pdf-list','Cgroup',text);store.out('pdf-list','Cgroup',text);
+ const rows=store.db.prepare('SELECT text FROM outgoing ORDER BY created').all();
+ assert.ok(rows.length>1);assert.ok(rows.every(r=>r.text.length<=4900));assert.equal((rows.map(r=>r.text).join('\n').match(/https:\/\/drive/g)||[]).length,66);
+});

@@ -135,7 +135,10 @@ export class Store {
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   out(id,group,text) {
-    this.db.prepare('INSERT OR IGNORE INTO outgoing(id,group_id,text,retry_key,created) VALUES(?,?,?,?,?)').run(id,group,text.slice(0,4900),randomUUID(),Date.now());
+    const chunks=[];let rest=String(text);
+    while(rest.length>4800){let end=rest.lastIndexOf('\n',4800);if(end<1)end=4800;if(/[\uD800-\uDBFF]/.test(rest[end-1]))end--;chunks.push(rest.slice(0,end));rest=rest.slice(end).replace(/^\n/,'');}
+    if(rest)chunks.push(rest);
+    chunks.forEach((chunk,i)=>this.db.prepare('INSERT OR IGNORE INTO outgoing(id,group_id,text,retry_key,created) VALUES(?,?,?,?,?)').run(i?`${id}:part:${i}`:id,group,chunk,randomUUID(),Date.now()+i));
   }
   takeAiCall(day,max){this.db.prepare('INSERT OR IGNORE INTO usage(day) VALUES(?)').run(day);return Number(this.db.prepare('UPDATE usage SET calls=calls+1 WHERE day=? AND calls<?').run(day,max).changes)===1;}
   addUsage(day,u){this.db.prepare('UPDATE usage SET input_tokens=input_tokens+?,output_tokens=output_tokens+? WHERE day=?').run(Number(u?.input_tokens)||0,Number(u?.output_tokens)||0,day);}
