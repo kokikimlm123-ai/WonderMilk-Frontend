@@ -45,3 +45,16 @@ test('best sample comparison includes all matches, not four chosen reports',asyn
  const ai={call:async()=>({groups:[['CS']],all:false,clarification:''}),answer:async(q,e)=>{assert.equal(e.matched_report_versions,39);assert.equal(e.reports.length,39);assert.ok(e.reports.every(r=>r.passes_CS_screen===null));return 'insufficient metrics';}};
  assert.equal(await answerCvas({schema_version:1,reports},'best CS sample',ai,'en'),'insufficient metrics');
 });
+
+import {rankingScope} from '../src/cvas.mjs';
+test('unqualified best CS bypasses filename model refusal in all three languages',async()=>{
+ for(const question of ['find the best CS sample','အကောင်းဆုံး CS sample ကိုရှာပေးပါ','หา CS sample ดีที่สุด']) {
+  const ai={call:async()=>{throw Error('scope model must not be called');},answer:async(q,e)=>{assert.equal(e.matched_report_versions,39);return 'comparison completed';}};
+  assert.equal(await answerCvas({schema_version:1,reports},question,ai,'en'),'comparison completed');
+ }
+});
+test('ranking scope retains farm and date restrictions for filtering',async()=>{
+ assert.equal(rankingScope('best CS RKS 260723').simpleCS,false);
+ const ai={call:async(prompt,input)=>{const q=JSON.parse(input[0].content[0].text).question;assert.doesNotMatch(q,/best/i);assert.match(q,/RKS 260723/);return {groups:[['CS'],['RKS'],['260723']],all:false,clarification:''};},answer:async(q,e)=>{assert.equal(e.matched_report_versions,39);return 'ok';}};
+ assert.equal(await answerCvas({schema_version:1,reports},'best CS RKS 260723',ai,'en'),'ok');
+});
