@@ -1,3 +1,4 @@
+import {labV11Request} from './lab-search.mjs';
 import {labAllowed,canPairLab} from './lab-access.mjs';
 import {cvasRequest,answerCvas} from './cvas.mjs';
 import {createHash} from 'node:crypto';
@@ -28,7 +29,7 @@ export class Worker {
         this.store.out(job.id,user,'CVAS private access is ready. Only approved accounts can read lab reports. Ask here: /cvas Show Lab ID 39170011 dry matter and starch. Members of the connected farm group can also request CVAS reports there using @WM /cvas.');
       } else {
         if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.finish(job.id);return;}
-        const answer=await answerCvas(await this.google.cvasIndex(),request,this.ai,replyLanguage(request));
+        const answer=await answerCvas(await this.google.cvasIndex(),request,this.ai,replyLanguage(request),{v11:this.c.labSearchV11,onAnalysis:a=>this.store.recordLabAnalysis(job.id,a)});
         this.store.out(job.id,user,answer);
       }
       this.store.finish(job.id);return;
@@ -69,8 +70,8 @@ export class Worker {
     if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.out(job.id,group,'စာပို့ပြီး အချိန်ကြာသွားလို့ အလိုအလျောက်မသိမ်းပါ။ ပြန်ပို့ပေးပါ။');this.store.finish(job.id);return;}
     if(text==='/help'||text==='/start'){this.store.out(job.id,group,HELP);this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
-    if(cvasRequest(text)) {
-      const answer=await answerCvas(await this.google.cvasIndex(),text,this.ai,replyLanguage(text));
+    if(cvasRequest(text)||(this.c.labSearchV11&&labV11Request(text))) {
+      const answer=await answerCvas(await this.google.cvasIndex(),text,this.ai,replyLanguage(text),{v11:this.c.labSearchV11,onAnalysis:a=>this.store.recordLabAnalysis(job.id,a)});
       this.store.out(job.id,group,answer);this.store.finish(job.id);return;
     }
     if(text.startsWith('/photo ')) {

@@ -1,3 +1,6 @@
+import {qualityMetrics} from './lab-metrics.mjs';
+export {qualityMetrics} from './lab-metrics.mjs';
+import {answerLabV11} from './lab-search.mjs';
 import {manualRequest,answerManual} from './manual.mjs';
 export function cvasRequest(text) { return manualRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก/i.test(text); }
 export function validateIndex(data) {
@@ -9,9 +12,10 @@ export function validateIndex(data) {
  }
  return data;
 }
-export async function answerCvas(index,question,ai,language) {
+export async function answerCvas(index,question,ai,language,options={}) {
  validateIndex(index);
  if(manualRequest(question))return answerManual(index,question,ai,language);
+ if(options.v11===true)return answerLabV11(index,question,ai,language,options);
  if(/best|worst|rank|အကောင်းဆုံး|အဆိုးဆုံး|ดีที่สุด|แย่ที่สุด/i.test(question))return rankSamples(index,question,ai,language);
  if(/\bpdfs?\b/i.test(question))return searchPdfs(index,question,ai,language);
  const exactIds=[...new Set(question.match(/\b\d{8}\b/g)||[])];
@@ -76,25 +80,6 @@ async function searchPdfs(index,question,ai,language) {
  if(found.clarification)return found.clarification;
  if(!found.reports.length)return ({my:'ကိုက်ညီသော PDF မတွေ့ပါ။ Naming code ကို ပြန်စစ်ပါ။',th:'ไม่พบ PDF ที่ตรงกัน กรุณาตรวจสอบรหัส',en:'No matching PDFs. Please check the naming code.'}[language]||'No matching PDFs.');
  return `${found.reports.length} PDF(s)\n\n`+originalPdfs({reports:found.reports},found.reports.map(r=>r.lab_id).join(' '),language);
-}
-// Extract only the known two-column CVAS layout. Missing values remain null.
-export function qualityMetrics(report) {
- const text=report.text,lines=text.split('\n');
- const heading=lines.find(l=>l.includes('SAMPLE INFORMATION')&&l.includes('MINERALS'));
- const split=heading?.indexOf('MINERALS');
- if(!split||split<50)return {layout:'unrecognized'};
- const left=(label)=>{
-  const row=lines.map(l=>l.slice(0,split)).find(l=>l.trimStart().startsWith(label)&&/^\s*(?:-?\d|$)/.test(l.trimStart().slice(label.length)));
-  if(!row)return null;
-  const nums=row.trimStart().slice(label.length).trim().match(/^(-?\d+(?:\.\d+)?)(?:\s+-?\d+(?:\.\d+)?)*$/);
-  return nums?Number(nums[0].trim().split(/\s+/).at(-1)):null;
- };
- const right=(label)=>{
-  const row=lines.map(l=>l.slice(split)).find(l=>l.trimStart().startsWith(label));
-  const value=row?.trimStart().slice(label.length).trim();
-  return value&&/^-?\d+(?:\.\d+)?$/.test(value)?Number(value):null;
- };
- return {DM_percent:left('Dry Matter'),starch_percent_DM:left('Starch'),CP_percent_DM:left('Crude Protein'),ADF_percent_DM:left('ADF'),NDF_percent_DM:left('aNDF'),lignin_percent_DM:left('Lignin'),NDFD12_percent_NDF:left('NDF Digestibility (12 hr)'),NDFD24_percent_NDF:left('NDF Digestibility (24 hr)'),NDFD30_percent_NDF:left('NDF Digestibility (30 hr)'),NDFD48_percent_NDF:left('NDF Digestibility (48 hr)'),NDFD72_percent_NDF:left('NDF Digestibility (72 hr)'),NDFD120_percent_NDF:left('NDF Digestibility (120 hr)'),NDFD240_percent_NDF:left('NDF Digestibility (240 hr)'),uNDF240:left('uNDF (240 hr)'),lactic_percent_DM:right('Lactic Acid (%DM)'),acetic_percent_DM:right('Acetic Acid (%DM)'),butyric_percent_DM:right('Butyric Acid (%DM)'),pH:right('pH')};
 }
 async function rankSamples(index,question,ai,language) {
  const scope=rankingScope(question);

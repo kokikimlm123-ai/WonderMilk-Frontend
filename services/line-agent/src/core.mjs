@@ -71,6 +71,12 @@ export class Store {
     this.db.prepare("UPDATE events SET status='queued' WHERE status='processing'").run();
   }
   close(){this.db.close();}
+  recordLabAnalysis(event,analysis) {
+    if(!event||analysis.status!=='draft'||!analysis.project_id||!analysis.snapshot_id)throw new Error('Invalid draft analysis');
+    // Lazy, additive table: V1 mode creates no new table. This is history, NOT verified knowledge.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS lab_analyses(event TEXT PRIMARY KEY,project_id TEXT NOT NULL,status TEXT NOT NULL CHECK(status='draft'),snapshot_id TEXT NOT NULL,value TEXT NOT NULL,created_at TEXT NOT NULL)`);
+    this.db.prepare('INSERT OR IGNORE INTO lab_analyses VALUES(?,?,?,?,?,?)').run(event,analysis.project_id,'draft',analysis.snapshot_id,JSON.stringify(analysis),new Date().toISOString());
+  }
   setting(k){return this.db.prepare('SELECT value FROM settings WHERE key=?').get(k)?.value;}
   set(k,v){this.db.prepare('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k,v);}
   bind(group,code,configuredCode) {
