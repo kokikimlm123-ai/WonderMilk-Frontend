@@ -1,3 +1,4 @@
+import {infoIntent,infoAnswer} from './bot-info.mjs';
 import {labAllowed,canPairLab} from './lab-access.mjs';
 import {cvasRequest,answerCvas} from './cvas.mjs';
 import {createHash} from 'node:crypto';
@@ -7,7 +8,7 @@ import {FARMS,missingConfiguration} from './config.mjs';
 import {UserError,validDate} from './core.mjs';
 import {RemoteError} from './integrations.mjs';
 
-export const HELP=`Wonder Milk Farm AI\nFarm 2 • Farm 4 • Ryokusan\nအဖွဲ့ဝင်အားလုံး မေး/သွင်း/ပြင်နိုင်ပါတယ်။\n\n/farm Farm 2 Cow 001 အချက်အလက်ပြပါ\n/farm Farm 4 2026-09-15 နေ့စုစုပေါင်းနို့ 850 kg စာရင်းသွင်းပါ\n/records Farm 4 — Bot စာရင်းနှင့် Record ID ရှာရန်\n/photo Farm 2 — နောက်ပို့မည့်ဖောင်၏ Farm သတ်မှတ်ရန်\nဖောင်ဓာတ်ပုံ ပို့နိုင်ပါတယ်။ မရှင်းလင်းသည့်အချက်ကို ပြန်မေးပါမယ်။\n/cancel — မပြီးသေးသောဖောင်ကို ရပ်ရန်\n\nမူလဖိုင်တွေကို ရှာဖတ်နိုင်ပြီး Bot ကသွင်းထားသောစာရင်းတွေကို ပြင်နိုင်ပါတယ်။ မူလဖိုင် row တွေကို တိုက်ရိုက်မပြင်သေးပါ။`;
+export const HELP=infoAnswer('help','en');
 const photoName=(g,m)=>createHash('sha256').update(g+':'+m).digest('hex')+'.image';
 function farmIn(text){const t=text.trim().toLowerCase().replace(/\s+/g,' ');return FARMS.find(f=>t===f.toLowerCase()||t===(f==='Ryokusan'?'ryokusan farm':f.replace(' ', '').toLowerCase()));}
 export function replyLanguage(text,fallback='en'){
@@ -24,6 +25,8 @@ export class Worker {
       if(canPairLab(this.c,this.store,e))this.store.set('lab_owner',user);
       if(!labAllowed(this.c,this.store,user)||e.type!=='message'||e.message?.type!=='text'){this.store.finish(job.id);return;}
       let request=(e.message.text||'').trim().replace(/^@(Wonder Milk Farm AI|WM)\s+/i,'');
+      const info=infoIntent(request);
+      if(info){this.store.out(job.id,user,infoAnswer(info,replyLanguage(request),{privateLab:true,labConfigured:!!this.c.cvasIndex}));this.store.finish(job.id);return;}
       if(/^\/lab-pair\b/i.test(request)||['/start','/help','/cvas'].includes(request)) {
         this.store.out(job.id,user,'CVAS private access is ready. Only approved accounts can read lab reports. Ask here: /cvas Show Lab ID 39170011 dry matter and starch. Members of the connected farm group can also request CVAS reports there using @WM /cvas.');
       } else {
@@ -67,7 +70,8 @@ export class Worker {
     if(e.message.type==='text'&&!mention){this.store.finish(job.id);return;}
     if(e.message.type==='image'&&!this.store.draft(actor)?.image_requested){this.store.finish(job.id);return;}
     if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.out(job.id,group,'စာပို့ပြီး အချိန်ကြာသွားလို့ အလိုအလျောက်မသိမ်းပါ။ ပြန်ပို့ပေးပါ။');this.store.finish(job.id);return;}
-    if(text==='/help'||text==='/start'){this.store.out(job.id,group,HELP);this.store.finish(job.id);return;}
+    const info=infoIntent(text);
+    if(info){this.store.out(job.id,group,infoAnswer(info,replyLanguage(text),{labConfigured:!!this.c.cvasIndex}));this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
     if(cvasRequest(text)) {
       const answer=await answerCvas(await this.google.cvasIndex(),text,this.ai,replyLanguage(text));
