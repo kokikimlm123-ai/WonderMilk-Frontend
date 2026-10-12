@@ -115,3 +115,24 @@ test('V1.1 is opt-in and full worker routes TMR comparison without creating farm
  assert.equal(store.db.prepare('SELECT count(*) n FROM lab_analyses').get().n,1);
  assert.match(store.db.prepare('SELECT text FROM outgoing').get().text,/39000001/);assert.equal(store.records(['Farm 2']).length,0);
 });
+
+
+test('scope commentary is rechecked before executing all matching numeric results',async()=>{
+ const data=index([report(1),report(2,{dm:32}),report(3,{labId:'39000001'})]);
+ let calls=0;
+ const ai={call:async()=>++calls===1?basePlan({clarification:'User asks for all Corn Silage samples; thresholds are not filename filters. Duplicate versions need next-stage handling.'}):basePlan({intent:'compare',filters:[{parameter:'DM_percent',operator:'gt',value:32},{parameter:'starch_percent_DM',operator:'gt',value:30}]})};
+ const out=await answerLabV11(data,'Compare all Corn Silage samples across every farm with DM >32%, Starch >30%; include PDF links and disclose duplicate versions',ai);
+ assert.equal(calls,2);assert.match(out,/Matched report versions: 2; distinct Lab IDs: 1/);
+ assert.match(out,/Multiple report versions/);assert.match(out,/report_1/);assert.match(out,/report_3/);assert.doesNotMatch(out,/report_2/);
+ assert.match(out,/Starch: 31/);
+});
+test('genuine clarification stays bounded and does not execute or journal results',async()=>{
+ let calls=0,journaled=false;
+ const ai={call:async()=>{calls++;return basePlan({clarification:'Please provide a literal date code.'});}};
+ const out=await answerLabV11(index([report(1)]),'CS from August 2026',ai,'en',{onAnalysis:()=>{journaled=true;}});
+ assert.equal(calls,2);assert.equal(journaled,false);assert.match(out,/date code/);
+});
+test('comparison plus PDF request retains comparison metrics and links',async()=>{
+ const out=await answerLabV11(index([report(1)]),'Compare all CS samples PDF',noAI);
+ assert.match(out,/ADF/);assert.match(out,/report_1/);
+});
