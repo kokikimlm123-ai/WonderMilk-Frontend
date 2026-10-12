@@ -20,7 +20,7 @@ for(const [lang,help,updates,marker] of [
   const id=`${lang}-${i}`;store.enqueue([{webhookEventId:id,timestamp:Date.now(),type:'message',source:{type:'group',groupId:'Cgroup',userId:'Uone'},message:{type:'text',text:'@WM '+q}}]);
   await w.process(store.next());
   const out=store.db.prepare('SELECT text FROM outgoing ORDER BY rowid DESC LIMIT 1').get();
-  assert.ok(out?.text.includes('8efe239'));
+  assert.ok(out?.text); if(i===1)assert.ok(out.text.includes('8efe239'));
   if(i===1)assert.ok(out.text.includes(marker));
  }
  assert.equal(store.draft('Cgroup:Uone').question,'pending cow record');assert.equal(store.records(['Farm 2']).length,0);
@@ -33,7 +33,7 @@ test('farm/laboratory requests retain existing routing',()=>{
  for(const q of ['/farm update cow 001','/ask bot system updates','/cvas Show CS PDFs','/records Farm 2','/photo Farm 4','/cancel','Update Farm 2 cow 001','Bot update cow 001 record','Compare all CS samples','Find Lab ID 39170011','Show recent farm records','How can you help cow 001?'])assert.equal(infoIntent(q),null,q);
 });
 test('release evidence remains explicitly dated and development-only even with V1.1 flag',()=>{
- const out=infoAnswer('updates','en',{labSearchV11:true});assert.match(out,/Verified production snapshot: 2026-10-12/);assert.match(out,/not a complete date-range history/);assert.match(out,/Not released to the production LINE bot/);assert.match(out,/No verified evidence here of newly approved knowledge/);
+ const out=infoAnswer('updates','en',{labSearchV11:true});assert.match(out,/Verified feature baseline: 2026-10-12/);assert.match(out,/not a complete date-range history/);assert.match(out,/Not released to the production LINE bot/);assert.match(out,/No verified evidence here of newly approved knowledge/);
  assert.doesNotMatch(infoAnswer('help','en'),/Laboratory:/);
  assert.match(infoAnswer('help','en',{privateLab:true,labConfigured:true}),/restricted to approved laboratory access/);
  assert.doesNotMatch(infoAnswer('help','en',{privateLab:true}),/create records/);
@@ -72,3 +72,12 @@ test('exact screenshot prompts with native LINE mention metadata reach informati
  assert.equal(store.draft('Cgroup:Uone'),null);
  assert.equal(store.records(['Farm 2']).length,0);
 });
+
+ test('capabilities omit release metadata in every language and chat scope',()=>{
+ for(const lang of ['en','my','th'])for(const privateLab of [false,true]){
+ const help=infoAnswer('help',lang,{privateLab,labConfigured:true});
+ assert.doesNotMatch(help,/2026-10|8efe239|3f59ef1|snapshot|development|V1\.1|\/updates/i);
+ assert.ok(help.includes('CVAS'));
+ const updates=infoAnswer('updates',lang);assert.match(updates,/2026-10-08/);assert.match(updates,/3f59ef1/);
+ }
+ });
