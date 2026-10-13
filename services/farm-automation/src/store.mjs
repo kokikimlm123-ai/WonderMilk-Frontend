@@ -20,9 +20,10 @@ export class Store {
     continue;
    }
    if(source.revoked)continue;
-   const r=await db.query('INSERT INTO v2_events(id,group_id,farm,message_id,actor,kind,body,source_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id',[e.id,e.group,e.farm,e.message,e.actor,e.kind,JSON.stringify({text:e.text}),e.at]);accepted+=r.rows.length;
+   const r=await db.query('INSERT INTO v2_events(id,group_id,farm,message_id,actor,kind,body,source_at,module) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING id',[e.id,e.group,e.farm,e.message,e.actor,e.kind,JSON.stringify({text:e.text}),e.at,e.module||'farm']);accepted+=r.rows.length;
   }return accepted;
  });}
+ async pair(candidate){return (await this.pool.query('INSERT INTO v2_pairings(token_hash,group_id,event_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING group_id',[candidate.hash,candidate.group,candidate.event])).rows.length>0;}
  async claim(){return this.tx(async db=>{
   await db.query("UPDATE v2_events SET status='failed',error_code='retry_exhausted' WHERE status='processing' AND attempts>=3 AND available_at<=now()");
   const e=(await db.query("SELECT * FROM v2_events WHERE (status='queued' OR status='processing') AND available_at<=now() AND attempts<3 ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1")).rows[0];if(!e)return null;
@@ -31,7 +32,7 @@ export class Store {
  async complete(e,result,evidence={}){return this.tx(async db=>{
   const source=await this.sourceLock(db,e.group_id,e.message_id);if(source.revoked)return false;
   const current=(await db.query('SELECT status FROM v2_events WHERE id=$1 FOR UPDATE',[e.id])).rows[0];if(current.status==='done')return true;
-  await db.query('INSERT INTO v2_drafts(id,group_id,farm,proposals,issues,method,evidence_key,evidence_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING',[e.id,e.group_id,e.farm,JSON.stringify(result.records),JSON.stringify(result.issues),result.method,evidence.key||null,evidence.hash||null]);
+  await db.query('INSERT INTO v2_drafts(id,group_id,farm,proposals,issues,method,evidence_key,evidence_hash,module) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING',[e.id,e.group_id,e.farm,JSON.stringify(result.records),JSON.stringify(result.issues),result.method,evidence.key||null,evidence.hash||null,e.module||'farm']);
   await db.query("UPDATE v2_events SET status='done',error_code=NULL WHERE id=$1",[e.id]);return true;
  });}
  async fail(e,code){await this.pool.query("UPDATE v2_events SET status=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,error_code=$2,available_at=now()+interval '30 seconds' WHERE id=$1 AND status='processing'",[e.id,code]);}
@@ -47,8 +48,8 @@ export class Store {
    if(d.status!=='pending'||d.version!==version)throw new Problem(409,'stale_or_final_draft');
    const proposals=records===undefined?d.proposals:records;
    if(decision==='approve'){
-    const errors=validateRecords(proposals);if(errors.length)throw new Problem(422,errors.join(';'));
-    for(const r of proposals)await db.query('INSERT INTO v2_records(id,draft_id,group_id,identity,value) VALUES($1,$2,$3,$4,$5)',[randomUUID(),id,d.group_id,identity(d.group_id,d.farm,r),JSON.stringify({...r,farm:d.farm,source_event:id,approved_by:actor.actor})]);
+    const errors=validateRecords(proposals,d.module);if(errors.length)throw new Problem(422,errors.join(';'));
+    for(const r of proposals)await db.query('INSERT INTO v2_records(id,draft_id,group_id,identity,value) VALUES($1,$2,$3,$4,$5)',[randomUUID(),id,d.group_id,identity(d.group_id,d.farm,r,d.module,id),JSON.stringify({...r,...(d.module==='warehouse'?{scope:d.farm,module:d.module}:{farm:d.farm}),source_event:id,approved_by:actor.actor})]);
    }
    await db.query('UPDATE v2_drafts SET status=$2,version=version+1,proposals=$3,issues=$4 WHERE id=$1',[id,decision==='approve'?'approved':'rejected',JSON.stringify(proposals),JSON.stringify(decision==='approve'?[]:d.issues)]);
    await db.query('INSERT INTO v2_audit VALUES($1,$2,$3,$4,$5,now())',[randomUUID(),id,actor.actor,decision,reason]);

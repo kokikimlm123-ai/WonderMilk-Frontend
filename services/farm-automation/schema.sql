@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS v2_media_deletions (key text PRIMARY KEY,created_at t
 CREATE TABLE IF NOT EXISTS v2_usage (day text PRIMARY KEY,calls integer NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS v2_queue ON v2_events(status,available_at);
 CREATE INDEX IF NOT EXISTS v2_review ON v2_drafts(group_id,status);
+
+-- Additive migration; existing farm events retain their original routing.
+ALTER TABLE v2_events ADD COLUMN IF NOT EXISTS module text NOT NULL DEFAULT 'farm';
+ALTER TABLE v2_drafts ADD COLUMN IF NOT EXISTS module text NOT NULL DEFAULT 'farm';
+
+CREATE TABLE IF NOT EXISTS v2_pairings (token_hash text PRIMARY KEY,group_id text NOT NULL,event_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());

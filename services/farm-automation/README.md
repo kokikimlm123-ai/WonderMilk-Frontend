@@ -89,4 +89,33 @@ Before any real-business pilot, take a development PostgreSQL backup with `pg_du
 - Dev-only Sheets output/sync is not implemented. The human review page requires provisioned reviewer tokens and a live acceptance session.
 - Edit events, multi-message/album correlation, corrections of approved records and full historical imports require subsequent work. Unknown event types are ignored, not claimed as supported.
 - Full retention/unsend reconciliation policy, workload and budget limits, monitoring/alerts, backup restore drill, and user acceptance before any production migration.
-- Accounting and Warehouse implementations are not included in this Farm-first pilot.
+- Accounting ledger automation is not implemented. Warehouse development scope and limitations are described below.
+
+## Warehouse and Corn Field development extension (2026-10-13)
+
+The same signed webhook/queue/reviewer infrastructure now routes groups by an explicit persisted module. Existing events default to `farm`; existing Farm record rules are unchanged. Warehouse groups are restricted to the development scope `Warehouse & Corn Field Test`:
+
+```json
+[{"id":"C11111111111111111111111111111111","farm":"Warehouse & Corn Field Test","module":"warehouse","enabled":true}]
+```
+
+The internal legacy `farm` scope column is retained for compatibility. Approved Warehouse records expose `module` and `scope`, not a real farm assignment. Every source message/photo remains separate. There are no inferred image-caption links, image dates, GPS-to-plot mappings, inventory balances or automatic payments.
+
+Record kinds: `warehouse_activity`, `warehouse_expense`, `fuel`, `maintenance`, `harvest`. All are drafts until reviewed. Narrow deterministic text patterns cover the supplied Thai fuel/loading/expense/repair examples and the English Orkel/harvest formats. Unmatched text, personnel leave, and every Warehouse image require manual classification/review. No Warehouse AI/OCR call is made. This is not general free-text multilingual extraction. The reviewer interface supports English, Myanmar and Thai; explicit JSON records can carry descriptions in any of these languages.
+
+Nullable date/plot fields mean unknown, not today's date or a guessed plot. Ambiguous numeric dates remain in the original description for correction. Fuel litres and THB are separate. Harvest bags, source-labeled weight, driver loads and area basis are separate; driver totals must agree. `corncobs` is not normalized to corn silage; area basis defaults to `unknown`. Reviewers must inspect warnings and supply a reason, and can approve an explicitly incomplete record. Records without confirmed dates/plot must not be used for date/plot yield reports.
+
+Example manual draft:
+```json
+{"kind":"fuel","date":null,"description":"Fuel reported; date not provided","vehicle":"Tractor 26","litres":47,"amount":3000,"currency":"THB","payment_status":"unknown"}
+```
+
+Warehouse approvals protect against repeated webhook delivery and repeated approval of the same draft. Reposted equivalent business records under different LINE message IDs still need manual duplicate review; no speculative business key merges separate operations. Expense records here are operational drafts, not accounting ledger postings. Image/raw text retention remains 30 days: this pilot is NOT a long-term photo archive. Historical import, archival retention/backups, inventory balances, live OCR and Sheets sync are outstanding.
+
+### One-time group discovery
+
+A short-lived `V2_PAIRING_TOKEN_HASH` (SHA-256) and ISO `V2_PAIRING_EXPIRES_AT` allow a signed group message `/pair WMV2-<32 lowercase hex characters>` to register one candidate group. Expiry must be no more than one hour away; source event must be within ten minutes. A database unique key makes consumption one-time, including replay and competing groups. Only the group ID is logged; no pairing text, token or sender is stored. Pairing does not activate intake, create a reviewer, or change the allowlist. Disable/expire the code after discovery, explicitly configure the confirmed test group and reviewer, then enable intake. No bot reply is sent.
+
+### Validation
+
+27 automated tests (PGlite plus signed HTTP fixtures) cover existing Farm flows, Warehouse approvals/withdrawal, source ambiguity, units, cross-module rejection and one-time pairing. They do not establish live LINE intake or image extraction accuracy. Development startup self-tests separately verify the cloud DB and private object storage.

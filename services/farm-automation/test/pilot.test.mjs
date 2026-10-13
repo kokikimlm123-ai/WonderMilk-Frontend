@@ -103,3 +103,30 @@ test('retention removes old source payloads and schedules evidence deletion',asy
 test('readiness honestly reports missing credentials and no Sheets synchronization',async()=>{await http(async base=>{assert.equal((await fetch(base+'/healthz')).status,200);const r=await fetch(base+'/readyz');assert.equal(r.status,503);const body=await r.json();assert.equal(body.aiConfigured,false);assert.equal(body.sheetsSyncEnabled,false);});});
 test('review page is public only as a login shell; no data, secrets or inline executable script',async()=>{await http(async base=>{const r=await fetch(base+'/review');assert.equal(r.status,200);assert.match(r.headers.get('content-security-policy'),/frame-ancestors 'none'/);const html=await r.text();assert.match(html,/type="password"/);assert.doesNotMatch(html,/synthetic-secret|test-reviewer-token/);assert.equal((await fetch(base+'/v2/records')).status,401);});});
 test('disabled groups still honour withdrawal without accepting new messages',async()=>{const mapped={...c,groups:c.groups.map(g=>({...g,enabled:false}))};assert.equal(normalizeEvent(event(),mapped),null);assert.equal(normalizeEvent(unsend(),mapped).kind,'unsend');});
+
+test('warehouse routing isolates draft validation and approval from Farm records',async()=>{
+ const wc=configuration({V2_ENV:'development',V2_INTAKE_ENABLED:'true',V2_GROUPS_JSON:JSON.stringify([{id:G2,farm:'Warehouse & Corn Field Test',module:'warehouse',enabled:true}])});
+ const message='เติมน้ำมันแทรกเตอร์เบอร์ 26 3,000 บาท 47 ลิตร';
+ await store.ingest([normalizeEvent(event('warehouse',G2,message),wc)]);
+ await new Worker(wc,store,{extract(){throw Error('Warehouse must not call farm AI');}},null).tick();
+ const reviewer={actor:'warehouse-reviewer',groups:[G2]};
+ const d=(await store.list(reviewer))[0];assert.equal(d.module,'warehouse');assert.equal(d.proposals[0].vehicle,'Tractor 26');assert.equal(d.proposals[0].date,null);assert.equal(d.proposals[0].payment_status,'unknown');
+ assert.equal((await store.records(reviewer)).length,0);
+ await assert.rejects(store.review('warehouse',reviewer,{version:1,decision:'approve',reason:'Wrong module',records:[milk]}),{status:422});
+ await store.review('warehouse',reviewer,{version:1,decision:'approve',reason:'Checked source; date and payment status remain unknown'});
+ const r=(await store.records(reviewer))[0];assert.equal(r.value.litres,47);assert.equal(r.value.amount,3000);assert.equal(r.value.scope,'Warehouse & Corn Field Test');assert.equal(r.value.farm,undefined);
+ assert.equal((await store.records(actor)).length,0);
+ await store.ingest([normalizeEvent(unsend('warehouse',G2),wc)]);assert.equal((await store.records(reviewer)).length,0);
+});
+
+test('signed one-time pairing captures only a candidate group while intake remains paused',async()=>{
+ const code='WMV2-'+'a'.repeat(32),pc={...c,enabled:false,groups:[],pairHash:hash(code),pairExpires:Date.now()+60000};
+ const server=createApp(pc,store,null);await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{const base='http://127.0.0.1:'+server.address().port;const body=JSON.stringify({events:[event('pair',G,'/pair '+code)]});
+ assert.equal((await fetch(base+'/webhook/line',{method:'POST',headers:signed(body+'x'),body})).status,401);
+ for(let i=0;i<2;i++)assert.equal((await fetch(base+'/webhook/line',{method:'POST',headers:signed(body),body})).status,200);
+ const other=JSON.stringify({events:[event('pair-other',G2,'/pair '+code)]});await fetch(base+'/webhook/line',{method:'POST',headers:signed(other),body:other});
+ const rows=(await db.query('SELECT * FROM v2_pairings')).rows;assert.equal(rows.length,1);assert.equal(rows[0].group_id,G);
+ assert.equal((await db.query('SELECT count(*) n FROM v2_events')).rows[0].n,0);
+ }finally{await new Promise(r=>server.close(r));}
+});

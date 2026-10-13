@@ -2,7 +2,7 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import pg from 'pg';
-import {configuration,normalizeEvent,Problem,reviewer,verify} from './domain.mjs';
+import {configuration,normalizeEvent,pairingCandidate,Problem,reviewer,verify} from './domain.mjs';
 import {bounded,Media,Extractor} from './integrations.mjs';
 import {Store} from './store.mjs';
 import {Worker} from './worker.mjs';
@@ -23,7 +23,9 @@ export function createApp(c,store,media){return createServer(async(req,res)=>{
    let body;try{body=JSON.parse(raw);}catch{throw new Problem(400,'invalid_json');}
    if(!Array.isArray(body?.events)||body.events.length>100)throw new Problem(400,'invalid_events');
    if(!body.events.length)return send(res,200,{ok:true});
-   const events=body.events.map(e=>normalizeEvent(e,c)).filter(Boolean);
+   const ordinary=[];
+   for(const e of body.events){const candidate=pairingCandidate(e,c);if(candidate){if(await store.pair(candidate))console.log(JSON.stringify({status:'development_group_pairing_candidate',groupId:candidate.group}));}else ordinary.push(e);}
+   const events=ordinary.map(e=>normalizeEvent(e,c)).filter(Boolean);
    // Honour deletion even while capture is paused. Do not acknowledge dropped intake.
    const withdrawals=events.filter(e=>e.kind==='unsend');if(withdrawals.length)await store.ingest(withdrawals);
    if(!c.enabled&&events.some(e=>e.kind!=='unsend'))throw new Problem(503,'intake_paused');

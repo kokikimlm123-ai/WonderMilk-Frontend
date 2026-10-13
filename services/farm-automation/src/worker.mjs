@@ -1,3 +1,4 @@
+import {operationDraft} from './operations.mjs';
 import {structuredText} from './domain.mjs';
 import {mediaKey} from './store.mjs';
 export class Worker {
@@ -8,13 +9,13 @@ export class Worker {
   if(!this.c.enabled)return;
   const e=await this.store.claim();if(!e)return;
   try{
-   if(!this.c.groups.some(g=>g.enabled&&g.id===e.group_id&&g.farm===e.farm))throw new Error('group_disabled');
+   if(!this.c.groups.some(g=>g.enabled&&g.id===e.group_id&&g.farm===e.farm&&g.module===(e.module||'farm')))throw new Error('group_disabled');
    let result,evidence={},image=null;
    if(e.kind==='image'){
     if(!this.media)throw new Error('media_not_configured');
     image=await this.media.download(e.message_id);evidence=await this.media.put(mediaKey(e.group_id,e.message_id),image);
-    result=await this.extractor.extract('',image,e.farm);
-   }else{result=structuredText(e.body?.text||'');if(result.issues.length){const extracted=await this.extractor.extract(e.body?.text||'',null,e.farm);result=extracted.method==='manual'&&result.records.length?{...result,issues:[...result.issues,...extracted.issues]}:extracted;}}
+    result=e.module==='warehouse'?{records:[],issues:['image_requires_manual_review','do_not_link_adjacent_messages_without_evidence'],method:'manual'}:await this.extractor.extract('',image,e.farm);
+   }else if(e.module==='warehouse'){result=operationDraft(e.body?.text||'');}else{result=structuredText(e.body?.text||'');if(result.issues.length){const extracted=await this.extractor.extract(e.body?.text||'',null,e.farm);result=extracted.method==='manual'&&result.records.length?{...result,issues:[...result.issues,...extracted.issues]}:extracted;}}
    if(Number(e.source_at)<Date.now()-15*60*1000)result.issues.push('delayed_event_check_record_date');
    if(!await this.store.complete(e,result,evidence)&&evidence.key)await this.media.remove(evidence.key);
   }catch(err){const safe=new Set(['group_disabled','media_not_configured','line_media_unavailable','unsupported_image','content_too_large','extraction_service_unavailable','extraction_incomplete','invalid_extraction']);await this.store.fail(e,safe.has(err.message)?err.message:'processing_failed');}

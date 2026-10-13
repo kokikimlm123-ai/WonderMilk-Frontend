@@ -1,3 +1,4 @@
+import {validateOperations} from './operations.mjs';
 import {createHash, createHmac, timingSafeEqual} from 'node:crypto';
 export const hash=v=>createHash('sha256').update(v).digest('hex');
 export class Problem extends Error {constructor(status,code){super(code);this.status=status;}}
@@ -9,17 +10,18 @@ export function configuration(e=process.env){
  const groups=JSON.parse(e.V2_GROUPS_JSON||'[]'), reviewers=JSON.parse(e.V2_REVIEWERS_JSON||'[]');
  if(!Array.isArray(groups)||groups.length>50||!Array.isArray(reviewers))throw new Error('Invalid V2 registry');
  const ids=new Set();
- for(const g of groups){if(!/^C[0-9a-f]{32}$/i.test(g.id)||!['Farm 2','Farm 4','Ryokusan'].includes(g.farm)||g.module!=='farm'||typeof g.enabled!=='boolean'||ids.has(g.id))throw new Error('Invalid group mapping');ids.add(g.id);}
+ for(const g of groups){if(!/^C[0-9a-f]{32}$/i.test(g.id)||!(g.module==='farm'&&['Farm 2','Farm 4','Ryokusan'].includes(g.farm)||g.module==='warehouse'&&g.farm==='Warehouse & Corn Field Test')||typeof g.enabled!=='boolean'||ids.has(g.id))throw new Error('Invalid group mapping');ids.add(g.id);}
  const actors=new Set();for(const r of reviewers){if(!/^[a-f0-9]{64}$/.test(r.tokenHash)||typeof r.actor!=='string'||!r.actor||actors.has(r.actor)||!Array.isArray(r.groups)||!r.groups.length||r.groups.some(g=>!ids.has(g)))throw new Error('Invalid reviewer');actors.add(r.actor);}
  const aiLimit=Number(e.V2_AI_CALLS_PER_DAY||20);if(!Number.isInteger(aiLimit)||aiLimit<0||aiLimit>1000)throw new Error('Invalid AI limit');
- return {port:Number(e.PORT||3000),database:e.V2_DATABASE_URL,groups,reviewers,enabled:e.V2_INTAKE_ENABLED==='true',secret:e.V2_LINE_CHANNEL_SECRET||'',lineToken:e.V2_LINE_CHANNEL_ACCESS_TOKEN||'',aiKey:e.V2_OPENAI_API_KEY||'',model:e.V2_OPENAI_MODEL||'',aiEnabled:e.V2_AI_ENABLED==='true',aiLimit,bucket:e.V2_S3_BUCKET||'',endpoint:e.V2_S3_ENDPOINT||'',region:e.V2_S3_REGION||'auto',accessKeyId:e.V2_S3_ACCESS_KEY_ID||'',secretAccessKey:e.V2_S3_SECRET_ACCESS_KEY||''};
+ return {pairHash:e.V2_PAIRING_TOKEN_HASH||'',pairExpires:Date.parse(e.V2_PAIRING_EXPIRES_AT||''),port:Number(e.PORT||3000),database:e.V2_DATABASE_URL,groups,reviewers,enabled:e.V2_INTAKE_ENABLED==='true',secret:e.V2_LINE_CHANNEL_SECRET||'',lineToken:e.V2_LINE_CHANNEL_ACCESS_TOKEN||'',aiKey:e.V2_OPENAI_API_KEY||'',model:e.V2_OPENAI_MODEL||'',aiEnabled:e.V2_AI_ENABLED==='true',aiLimit,bucket:e.V2_S3_BUCKET||'',endpoint:e.V2_S3_ENDPOINT||'',region:e.V2_S3_REGION||'auto',accessKeyId:e.V2_S3_ACCESS_KEY_ID||'',secretAccessKey:e.V2_S3_SECRET_ACCESS_KEY||''};
 }
 export function reviewer(c,authorization){
  const token=typeof authorization==='string'&&authorization.match(/^Bearer ([A-Za-z0-9_-]{32,200})$/)?.[1];
  return token?c.reviewers.find(r=>equal(r.tokenHash,hash(token))):undefined;
 }
 export const recordFields=['kind','date','cow_id','session','group_name','feed_name','pregnancy_result','milk_kg','cows_milked','leftover_kg','delivered_kg','notes'];
-export function validateRecords(records){
+export function validateRecords(records,module='farm'){
+ if(module==='warehouse')return validateOperations(records);
  const errors=[];
  if(!Array.isArray(records)||records.length<1||records.length>40)return ['records_required_1_to_40'];
  records.forEach((r,i)=>{
@@ -39,7 +41,7 @@ export function validateRecords(records){
   if(r.leftover_kg!=null&&r.delivered_kg!=null&&r.leftover_kg>r.delivered_kg)error('leftover_exceeds_delivered');
  });return errors;
 }
-export function identity(group,farm,r){return hash(JSON.stringify([farm,r.kind,r.date,r.cow_id||'',(r.session||'').trim().toLowerCase(),(r.group_name||'').trim().toLowerCase(),(r.feed_name||'').trim().toLowerCase()]));}
+export function identity(group,farm,r,module='farm',source=''){if(module==='warehouse')return hash(JSON.stringify([module,group,source,r]));return hash(JSON.stringify([farm,r.kind,r.date,r.cow_id||'',(r.session||'').trim().toLowerCase(),(r.group_name||'').trim().toLowerCase(),(r.feed_name||'').trim().toLowerCase()]));}
 const labels={type:'kind',record_type:'kind','အမျိုးအစား':'kind','ประเภท':'kind','ရက်စွဲ':'date','วันที่':'date','နွားနံပါတ်':'cow_id','รหัสโค':'cow_id','အချိန်ပိုင်း':'session','รอบ':'session','အုပ်စု':'group_name','กลุ่ม':'group_name','အစာ':'feed_name','อาหาร':'feed_name','ကိုယ်ဝန်ရလဒ်':'pregnancy_result','ผลตรวจท้อง':'pregnancy_result','နို့_kg':'milk_kg','น้ำนม_kg':'milk_kg','အစာကျန်_kg':'leftover_kg','อาหารเหลือ_kg':'leftover_kg','အစာပေး_kg':'delivered_kg','อาหารให้_kg':'delivered_kg'};
 const kinds={'pregnancy':'pregnancy','ကိုယ်ဝန်':'pregnancy','ตรวจท้อง':'pregnancy','milk':'milk','နို့':'milk','น้ำนม':'milk','feed_leftover':'feed_leftover','အစာကျန်':'feed_leftover','อาหารเหลือ':'feed_leftover'};
 const results={'pregnant':'pregnant','ကိုယ်ဝန်ရှိ':'pregnant','ท้อง':'pregnant','open':'open','ကိုယ်ဝန်မရှိ':'open','ไม่ท้อง':'open','uncertain':'uncertain','မသေချာ':'uncertain','ไม่แน่ใจ':'uncertain'};
@@ -61,9 +63,17 @@ export function normalizeEvent(e,c){
  const group=c.groups.find(g=>g.id===e?.source?.groupId);
  if(!group||e.source.type!=='group')return null;
  if(typeof e.webhookEventId!=='string'||!e.webhookEventId||e.webhookEventId.length>200||!Number.isFinite(e.timestamp)||e.timestamp>Date.now()+300000)throw new Problem(400,'invalid_event');
- if(e.type==='unsend'){if(typeof e.unsend?.messageId!=='string')throw new Problem(400,'invalid_unsend');return {id:e.webhookEventId,group:group.id,farm:group.farm,message:e.unsend.messageId,kind:'unsend',at:e.timestamp};}
+ if(e.type==='unsend'){if(typeof e.unsend?.messageId!=='string')throw new Problem(400,'invalid_unsend');return {id:e.webhookEventId,group:group.id,farm:group.farm,module:group.module,message:e.unsend.messageId,kind:'unsend',at:e.timestamp};}
  if(!group.enabled||e.type!=='message'||!['text','image'].includes(e.message?.type))return null;
  if(typeof e.message.id!=='string'||e.message.id.length>200)throw new Problem(400,'invalid_message');
  if(e.message.type==='text'&&(typeof e.message.text!=='string'||e.message.text.length>10000))throw new Problem(400,'invalid_text');
- return {id:e.webhookEventId,group:group.id,farm:group.farm,message:e.message.id,actor:e.source.userId||null,kind:e.message.type,text:e.message.text||null,at:e.timestamp};
+ return {id:e.webhookEventId,group:group.id,farm:group.farm,module:group.module,message:e.message.id,actor:e.source.userId||null,kind:e.message.type,text:e.message.text||null,at:e.timestamp};
+}
+
+export function pairingCandidate(e,c,now=Date.now()){
+ if(!/^[a-f0-9]{64}$/.test(c.pairHash||'')||!Number.isFinite(c.pairExpires)||now>c.pairExpires||c.pairExpires-now>3600000)return null;
+ if(e?.type!=='message'||e.source?.type!=='group'||!/^C[0-9a-f]{32}$/i.test(e.source.groupId||'')||e.message?.type!=='text'||typeof e.webhookEventId!=='string'||!Number.isFinite(e.timestamp)||Math.abs(now-e.timestamp)>600000)return null;
+ if(typeof e.message.text!=='string')return null;
+ const token=e.message.text.match(/^\/pair (WMV2-[a-f0-9]{32})$/)?.[1];
+ return token&&equal(hash(token),c.pairHash)?{hash:c.pairHash,group:e.source.groupId,event:e.webhookEventId}:null;
 }
