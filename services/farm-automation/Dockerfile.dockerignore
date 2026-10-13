@@ -1,0 +1,11 @@
+**
+!services/
+!services/farm-automation/
+!services/farm-automation/package.json
+!services/farm-automation/package-lock.json
+!services/farm-automation/schema.sql
+!services/farm-automation/src/
+!services/farm-automation/src/**
+!services/farm-automation/public/
+!services/farm-automation/public/**
+!services/farm-automation/Dockerfile

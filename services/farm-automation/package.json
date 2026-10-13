@@ -1,0 +1,1 @@
+{"name":"argo-wm-v2-farm","version":"2.0.0-dev.1","private":true,"type":"module","engines":{"node":">=24"},"scripts":{"start":"node src/server.mjs","test":"node --test test/*.test.mjs"},"dependencies":{"@aws-sdk/client-s3":"3.1150.0","pg":"8.23.1"},"devDependencies":{"@electric-sql/pglite":"0.5.9"}}
