@@ -7,9 +7,10 @@ import {bounded,Media,Extractor} from './integrations.mjs';
 import {Store} from './store.mjs';
 import {Worker} from './worker.mjs';
 import {selftest} from './selftest.mjs';
+import {GoogleOAuth,googleConfiguration} from './google-oauth.mjs';
 const send=(res,status,data)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});res.end(JSON.stringify(data));};
 export function readiness(c){return {environment:'development',intakeEnabled:c.enabled,groups:c.groups.filter(g=>g.enabled).length,lineConfigured:!!(c.secret&&c.lineToken),reviewConfigured:c.reviewers.length>0,aiConfigured:!!(c.aiEnabled&&c.aiKey&&c.model),mediaConfigured:!!(c.bucket&&c.endpoint&&c.accessKeyId&&c.secretAccessKey),sheetsSyncEnabled:false};}
-export function createApp(c,store,media){return createServer(async(req,res)=>{
+export function createApp(c,store,media,google=null){return createServer(async(req,res)=>{
  try{
   const path=new URL(req.url,'http://localhost').pathname;
   if(req.method==='GET'&&['/','/review','/review.js'].includes(path)){const script=path==='/review.js';const file=await readFile(new URL(script?'../public/review.js':'../public/review.html',import.meta.url));res.writeHead(200,{'content-type':script?'text/javascript; charset=utf-8':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','content-security-policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"});return res.end(file);}
@@ -31,8 +32,18 @@ export function createApp(c,store,media){return createServer(async(req,res)=>{
    if(!c.enabled&&events.some(e=>e.kind!=='unsend'))throw new Problem(503,'intake_paused');
    const accepted=await store.ingest(events.filter(e=>e.kind!=='unsend'));return send(res,200,{ok:true,accepted});
   }
+  if(req.method==='GET'&&path==='/oauth/google/callback'){
+   if(!google)throw new Problem(503,'google_setup_required');
+   await google.complete(new URL(req.url,'http://localhost').searchParams,req.headers.cookie);
+   res.writeHead(303,{'location':'/review?google=connected','set-cookie':'__Host-v2-google=; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age=0','cache-control':'no-store','referrer-policy':'no-referrer'});return res.end();
+  }
   if(!path.startsWith('/v2/'))throw new Problem(404,'not_found');
   const actor=reviewer(c,req.headers.authorization);if(!actor)throw new Problem(401,'reviewer_authorization_required');
+  if(req.method==='GET'&&path==='/v2/google/status')return send(res,200,google?await google.status(actor):{configured:false,connected:false,uploadsEnabled:false});
+  if(req.method==='POST'&&path==='/v2/google/connect'){
+   if(!google)throw new Problem(503,'google_setup_required');
+   const result=await google.begin(actor);res.setHeader('set-cookie',result.cookie);return send(res,200,{url:result.url});
+  }
   if(req.method==='GET'&&path==='/v2/drafts')return send(res,200,{drafts:await store.list(actor)});
   if(req.method==='GET'&&path==='/v2/records')return send(res,200,{records:await store.records(actor)});
   if(req.method==='GET'&&path==='/v2/events')return send(res,200,{events:await store.status(actor)});
@@ -51,7 +62,7 @@ export async function start(){
  const store=new Store(pool);await store.init();
  const media=c.bucket&&c.endpoint&&c.accessKeyId&&c.secretAccessKey?new Media(c):null;
  if(process.env.V2_SELFTEST_ON_START==='true')await selftest(pool,media);
- const worker=new Worker(c,store,new Extractor(c,store),media),server=createApp(c,store,media);
+ const worker=new Worker(c,store,new Extractor(c,store),media),server=createApp(c,store,media,new GoogleOAuth(googleConfiguration(),pool));
  server.requestTimeout=15000;server.headersTimeout=10000;
  const timer=setInterval(()=>worker.tick().catch(()=>console.error('worker_tick_failed')),1000);
  await new Promise(resolve=>server.listen(c.port,'0.0.0.0',resolve));console.log(JSON.stringify({status:'listening',...readiness(c)}));

@@ -1,0 +1,30 @@
+{
+  "status": "prepared_not_active",
+  "rootFolderId": "1WMG7GNjU16_NFXQgHmLKALuWcW0j251r",
+  "groupId": "C97bd87e9b48325acc9d3bf683a69dd98",
+  "groupFolderId": "1NHWv2bPveurl7vzkEJ5Deh2uvAGJ5-0U",
+  "categories": [
+    {
+      "name": "Petty Cash",
+      "folderId": "11fG8aGXNVpXZiKBOfZ7mz0ZVT9HXWB2G"
+    },
+    {
+      "name": "Corn Field Records",
+      "folderId": "1NO5dglsw9_OzDVdmrDpcW-W3V_6zxa6e"
+    },
+    {
+      "name": "Warehouse Fixing Records",
+      "folderId": "1lE5Wtk5AYVfoDfPHF7wY22nrL0l8Z0sX"
+    },
+    {
+      "name": "Cleaning Records",
+      "folderId": "1GIeLBgAqiLsxlTnDPdB_yIQk8WhgaMG6"
+    },
+    {
+      "name": "Needs Review",
+      "folderId": "1Q4vtwiEHLZOSLOKfbphmpzB-5lbpoh8-"
+    }
+  ],
+  "runtimeAuthorization": "not_configured",
+  "sharingVerification": "root anyone writer observed; restrict before evidence upload"
+}

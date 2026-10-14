@@ -29,3 +29,13 @@ ALTER TABLE v2_events ADD COLUMN IF NOT EXISTS module text NOT NULL DEFAULT 'far
 ALTER TABLE v2_drafts ADD COLUMN IF NOT EXISTS module text NOT NULL DEFAULT 'farm';
 
 CREATE TABLE IF NOT EXISTS v2_pairings (token_hash text PRIMARY KEY,group_id text NOT NULL,event_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+
+-- Optional V2 Google authorization, independent of LINE intake and record tables.
+CREATE TABLE IF NOT EXISTS v2_google_states (
+ actor text PRIMARY KEY,state_hash text UNIQUE NOT NULL,cookie_hash text NOT NULL,
+ verifier text NOT NULL,expires_at timestamptz NOT NULL
+);
+CREATE TABLE IF NOT EXISTS v2_google_connection (
+ id integer PRIMARY KEY CHECK(id=1),actor text NOT NULL,refresh_token text NOT NULL,
+ scope text NOT NULL,connected_at timestamptz NOT NULL DEFAULT now()
+);
