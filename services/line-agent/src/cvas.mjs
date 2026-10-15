@@ -1,5 +1,5 @@
-import {manualRequest,answerManual} from './manual.mjs';
-export function cvasRequest(text) { return manualRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก/i.test(text); }
+import {manualRequest,nutritionRequest,answerManual} from './manual.mjs';
+export function cvasRequest(text) { return manualRequest(text)||nutritionRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก/i.test(text); }
 export function validateIndex(data) {
  if(data?.schema_version!==1||!Array.isArray(data.reports)||data.reports.length>1000)throw new Error('Invalid CVAS index');
  const keys=new Set();
