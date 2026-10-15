@@ -22,6 +22,20 @@ test('V1 routes nutrition questions without changing CVAS lab report routes',()=
  for(const q of ['/nutrition DDGS','What is rumen degradable protein?','Dairy nutrition basics','နွားအာဟာရ','โภชนาการโคนม']) {
   assert.equal(nutritionRequest(q),true,q);assert.equal(cvasRequest(q),true,q);
  }
+ for(const q of [
+  'How should dairy cows be cooled using water sprinklers and fans?',
+  'How should dairy cows be cooled using water sprinklers and fans? Where should cooling be provided, and how does heat stress affect milk production?',
+  'Does heat stress reduce milk production?',
+  'How does soaking and cooling work for dairy cows?',
+  'နွားတွေကို ရေဖြန်းပြီး ပန်ကာနဲ့ ဘယ်လိုအအေးခံမလဲ',
+  'โคนมควรใช้พัดลมลดความร้อนอย่างไร',
+ ]) {
+  assert.equal(nutritionRequest(q),true,q);
+  assert.equal(cvasRequest(q),true,q);
+ }
+ for(const q of ['How to cool milk tank?', 'Farm 2 cow heat stress records yesterday', '39170011 Dry Matter result']) {
+  assert.equal(nutritionRequest(q),false,q);
+ }
  assert.equal(nutritionRequest('39170011 Dry Matter result'),false);
  assert.equal(manualRequest('39170011 Dry Matter result'),false);
 });
@@ -57,4 +71,32 @@ test('Actual LINE group @WM message reaches nutrition answer and cites original 
  assert.equal(lookedUp,true);
  assert.match(out,/Slide 29/);
  assert.match(out,/feed bunk access/);
+});
+
+test('LINE group natural cooling question without command is answered from slides 35 and 38',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'nutrition-cooling-')),store=new Store(dir);
+ t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+ let lookupCount=0;
+ const google={cvasIndex:async()=>{lookupCount++;return index;}};
+ const ai={call:async(prompt,input)=>{
+  const evidence=JSON.parse(input[0].content[0].text);
+  assert.equal(evidence.pages.length,36);
+  assert(evidence.pages.some(p=>p.pdf_page===35));
+  assert(evidence.pages.some(p=>p.pdf_page===38));
+  assert.match(prompt,/slide numbers/i);
+  return {answer:'Provide shade, sprinklers, fans and clean water in holding pen, exit lane and feedline. Heat stress reduces milk yield.',cited_pages:['dairy-nutrition-walter-chen:35','dairy-nutrition-walter-chen:38']};
+ }};
+ const bot=new Worker({group:'Cgroup',cvasIndex:'configured'},store,google,ai,{});
+ const q='How should dairy cows be cooled using water sprinklers and fans?';
+ const mention='@ARGO–WM Farm AIRobot';
+ const e={webhookEventId:'nutrition-natural-cooling',type:'message',timestamp:Date.now(),
+  source:{type:'group',groupId:'Cgroup',userId:'Uone'},
+  message:{type:'text',text:mention+'\n'+q,mention:{mentionees:[{index:0,length:mention.length,isSelf:true}]}}};
+ store.enqueue([e]);await bot.process(store.next());
+ const out=store.db.prepare('SELECT text FROM outgoing WHERE id=?').get(e.webhookEventId)?.text;
+ assert.equal(lookupCount,1);
+ assert.match(out,/holding pen/);
+ assert.match(out,/Slide 35/);
+ assert.match(out,/Slide 38/);
+ assert.notEqual(out,q);
 });
