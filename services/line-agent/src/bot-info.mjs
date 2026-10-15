@@ -8,7 +8,7 @@ const pick=(lang,en,my,th)=>({en,my,th}[lang]||en);
 export function infoIntent(text) {
  const t=text.trim();
  // Explicit task commands always keep their established handlers.
- if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|lab-pair)\b/i.test(t))return null;
+ if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|lab-pair)\b/i.test(t))return null;
  if(/^\/(?:updates|version|changelog)(?:\s|$)/i.test(t))return 'updates';
  if(/^\/(?:help|start|capabilities)(?:\s|$)/i.test(t))return 'help';
  if(/\b(?:update|create|save|record|edit)\b.*\b(?:cow|milk|farm|record|sample)\b/i.test(t)&&! /\b(?:system|release|version|capabilities|features)\b/i.test(t))return null;
@@ -41,6 +41,10 @@ export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=
  'Farm စာရင်းများ: ရရှိထားသော နွားတစ်ကောင်ချင်းအချက်အလက်၊ နို့ထုတ်လုပ်မှု၊ အစာ၊ ကျန်းမာရေးနှင့် မျိုးပွားမှုစာရင်းများကို Farm၊ Cow ID၊ ရက်စွဲဖြင့် ရှာဖွေ၊ အကျဉ်းချုပ်၊ နှိုင်းယှဉ်နိုင်ပါသည်။ /records ဖြင့် Bot Record ID ရှာနိုင်ပြီး /photo ဖြင့် ဖောင်ပုံမပို့မီ Farm ရွေးနိုင်ပါသည်။ /cancel ဖြင့် မပြီးသေးသောဖောင်ကို ရပ်နိုင်ပါသည်။ မရှင်းလင်းသောဖောင်အချက်အလက်များကို မသိမ်းမီ ပြန်မေးပါသည်။',
  'ข้อมูลฟาร์ม: ประวัติโค ผลผลิตน้ำนม อาหาร สุขภาพ และการสืบพันธุ์ตามข้อมูลที่มี ค้นหาตามฟาร์ม รหัสโค หรือวันที่ สรุปและเปรียบเทียบข้อมูล ใช้ /records ค้นหา ID รายการของบอท /photo เลือกฟาร์มก่อนส่งรูปแบบฟอร์ม และ /cancel ยกเลิกแบบฟอร์มที่ค้าง ข้อมูลไม่ชัดเจนจะถามก่อนบันทึก'));
  if(labConfigured)lines.push(say('Laboratory: look up CVAS reports and original PDF links; compare available results; ask procedures from the supplied CVAS manual with page citations. Answers depend on available source data.','Laboratory: CVAS reports နှင့် မူရင်း PDF links ရှာခြင်း၊ ရရှိသောရလဒ်များ နှိုင်းယှဉ်ခြင်း၊ ပေးထားသော CVAS manual မှ လုပ်နည်းများကို စာမျက်နှာကိုးကားချက်ဖြင့် မေးနိုင်ပါသည်။ အဖြေသည် ရရှိသောရင်းမြစ်အပေါ် မူတည်ပါသည်။','ห้องปฏิบัติการ: ค้นหารายงาน CVAS และลิงก์ PDF ต้นฉบับ เปรียบเทียบผลที่มี และถามขั้นตอนจากคู่มือ CVAS ที่ให้ไว้พร้อมเลขหน้า คำตอบขึ้นอยู่กับข้อมูลต้นทาง'));
+ if(labConfigured)lines.push(say(
+ 'Dairy nutrition: ask questions from Dr. Walter Chen\'s 36 indexed nutrition slides. Use /nutrition followed by your question. Responses cite original slide numbers (slides 24 and 34 are excluded).',
+ 'နို့စားနွားအာဟာရ: Dr. Walter Chen ၏ စုစည်းထားသော သင်ခန်းစာ ၃၆ စာမျက်နှာကို /nutrition နောက်တွင် မေးခွန်းရေးပြီး မေးနိုင်ပါသည်။ မူရင်း Slide နံပါတ်များကို ကိုးကားပေးပါသည် (Slide 24 နှင့် 34 မပါဝင်ပါ)။',
+ 'โภชนาการโคนม: ถามจากสไลด์ 36 หน้าของ Dr. Walter Chen โดยพิมพ์ /nutrition ตามด้วยคำถาม คำตอบอ้างอิงหมายเลขสไลด์ต้นฉบับ (ไม่รวมสไลด์ 24 และ 34)'));
  if(privateLab)lines.push(say('This private chat is restricted to approved laboratory access. Use the connected group for farm records.','ဤ private chat သည် ခွင့်ပြုထားသော laboratory access အတွက်သာ ဖြစ်ပါသည်။ Farm records အတွက် ချိတ်ထားသော group ကို သုံးပါ။','แชตส่วนตัวนี้จำกัดเฉพาะสิทธิ์ห้องปฏิบัติการที่อนุมัติ ใช้กลุ่มที่เชื่อมต่อสำหรับข้อมูลฟาร์ม'));
  lines.push(privateLab?'/cvas Show Lab ID 39170011 dry matter and starch.': '/farm Farm 2 Cow 001\n/records Farm 4\n/photo Farm 2\n/cancel');
  lines.push(say('I respond in Myanmar, English or Thai to match your message.','မေးထားသောဘာသာစကားအလိုက် မြန်မာ၊ အင်္ဂလိပ်၊ ထိုင်းဘာသာဖြင့် ပြန်ဖြေပါသည်။','ตอบเป็นภาษาเมียนมา อังกฤษ หรือไทยตามภาษาที่คุณใช้'));
