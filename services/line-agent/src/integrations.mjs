@@ -90,9 +90,9 @@ export class Google {
     if(this.cvasCached && Date.now()-this.cvasCached.at<300000)return this.cvasCached.data;
     const data=await json(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(this.c.cvasIndex)}?alt=media`,{headers:{authorization:`Bearer ${await this.token()}`}},8*1024*1024);
     // Preserve the original private CVAS Drive index. Supplement the local
-    // knowledge library with bundled, read-only slide indexes in this release.
+    // knowledge library with bundled, read-only slide and PDF-page indexes.
     if(data?.manuals!==undefined&&!Array.isArray(data.manuals))throw new Error('Invalid manual collection');
-    const added=await Promise.all(['nutrition-manual.json','mastitis-manual.json'].map(
+    const added=await Promise.all(['nutrition-manual.json','mastitis-manual.json','forage-analysis-guide.json'].map(
       async filename=>JSON.parse(await readFile(new URL('./'+filename,import.meta.url),'utf8'))));
     const manuals=[...(data.manuals||[])];
     const existingIds=new Set(manuals.map(m=>m.id));
