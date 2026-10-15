@@ -1,5 +1,5 @@
 export function nutritionRequest(text) {
- return /^\\/(?:nutrition|feeding)(?:\\s|$)/i.test(text)||/\\b(?:dairy nutrition|dairy feeding|feed bunk|feed efficiency|dry matter intake|dmi|rumen|ruminal|ddgs|cow cooling|cow comfort|nutrient requirement|milk cow nutrition)\\b|နွားအာဟာရ|အစာအာဟာရ|နို့စားနွားအစာ|အစာကျွေး|โภชนาการโคนม|การให้อาหารโคนม/i.test(text);
+ return /^\/(?:nutrition|feeding)(?:\s|$)/i.test(text)||/\b(?:dairy nutrition|dairy feeding|feed bunk|feed efficiency|dry matter intake|dmi|rumen|ruminal|ddgs|cow cooling|cow comfort|nutrient requirement|milk cow nutrition)\b|နွားအာဟာရ|အစာအာဟာရ|နို့စားနွားအစာ|အစာကျွေး|โภชนาการโคนม|การให้อาหารโคนม/i.test(text);
 }
 export function manualRequest(text) {
  if(nutritionRequest(text))return true;
