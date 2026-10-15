@@ -8,7 +8,7 @@ const pick=(lang,en,my,th)=>({en,my,th}[lang]||en);
 export function infoIntent(text) {
  const t=text.trim();
  // Explicit task commands always keep their established handlers.
- if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|mastitis|milkquality|milking|lab-pair)\b/i.test(t))return null;
+ if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|mastitis|milkquality|milking|forage|forageguide|feedanalysis|lab-pair)\b/i.test(t))return null;
  if(/^\/(?:updates|version|changelog)(?:\s|$)/i.test(t))return 'updates';
  if(/^\/(?:help|start|capabilities)(?:\s|$)/i.test(t))return 'help';
  if(/\b(?:update|create|save|record|edit)\b.*\b(?:cow|milk|farm|record|sample)\b/i.test(t)&&! /\b(?:system|release|version|capabilities|features)\b/i.test(t))return null;
@@ -49,6 +49,10 @@ export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=
  'Milk quality and mastitis: 77 slides from Todd Meyer DVM (USGC Thailand, March 2024), indexed as visual source summaries. Ask /mastitis or /milkquality; answers cite the original slide number. Mastitis treatments need veterinary assessment.',
  'နို့အရည်အသွေးနှင့် နို့အုံရောင်ရမ်းရောဂါ: Dr. Todd Meyer ၏ သင်ခန်းစာ Slide ၇၇ ခုကို ပုံအခြေခံ အကျဉ်းချုပ်များအဖြစ် ထည့်ထားပါသည်။ /mastitis သို့မဟုတ် /milkquality ဖြင့် မေးနိုင်ပြီး မူရင်း Slide နံပါတ်ကို ကိုးကားပေးပါမည်။ ဆေးကုသမှုအတွက် တိရစ္ဆာန်ဆရာဝန် စစ်ဆေးမှုလိုအပ်ပါသည်။',
  'คุณภาพน้ำนมและเต้านมอักเสบ: เพิ่มสรุปจากภาพสไลด์ 77 หน้าของ Dr. Todd Meyer ถามด้วย /mastitis หรือ /milkquality คำตอบอ้างอิงเลขสไลด์ การรักษาต้องให้สัตวแพทย์ประเมิน'));
+ if(labConfigured)lines.push(say(
+ 'Forage analysis interpretation: the two-page Cornell Precision Feed Manager guide explains forage DM, CP, NDF/NDFD, starch, ash, minerals, energy and silage fermentation reference goals. Use /forage followed by a question; responses cite PDF page 1 or 2. These guide targets do not replace actual CVAS results.',
+ 'အစာဓာတ်ခွဲရလဒ် ဖတ်ရှုနည်း: Cornell Precision Feed Manager ၏ PDF စာမျက်နှာ ၂ ခုပါ Guide မှ DM၊ CP၊ NDF/NDFD၊ Starch၊ Ash၊ Minerals၊ Energy နှင့် Silage Fermentation ရည်မှန်းချက်များကို /forage ဖြင့် မေးနိုင်ပါသည်။ အဖြေမှာ PDF စာမျက်နှာ ၁ သို့မဟုတ် ၂ ကို ကိုးကားပါမည်။ Guide ရည်မှန်းချက်များသည် CVAS စစ်ဆေးရလဒ်အစစ်များ မဟုတ်ပါ။',
+ 'การอ่านผลวิเคราะห์อาหารหยาบ: คู่มือ Cornell Precision Feed Manager แบบ PDF 2 หน้าอธิบายค่าเป้าหมาย DM, CP, NDF/NDFD, แป้ง, แร่ธาตุ, พลังงานและการหมัก ถามด้วย /forage คำตอบอ้างอิงหน้า PDF 1 หรือ 2 เป้าหมายในคู่มือไม่ใช่ผลตรวจ CVAS จริง'));
  if(privateLab)lines.push(say('This private chat is restricted to approved laboratory access. Use the connected group for farm records.','ဤ private chat သည် ခွင့်ပြုထားသော laboratory access အတွက်သာ ဖြစ်ပါသည်။ Farm records အတွက် ချိတ်ထားသော group ကို သုံးပါ။','แชตส่วนตัวนี้จำกัดเฉพาะสิทธิ์ห้องปฏิบัติการที่อนุมัติ ใช้กลุ่มที่เชื่อมต่อสำหรับข้อมูลฟาร์ม'));
  lines.push(privateLab?'/cvas Show Lab ID 39170011 dry matter and starch.': '/farm Farm 2 Cow 001\n/records Farm 4\n/photo Farm 2\n/cancel');
  lines.push(say('I respond in Myanmar, English or Thai to match your message.','မေးထားသောဘာသာစကားအလိုက် မြန်မာ၊ အင်္ဂလိပ်၊ ထိုင်းဘာသာဖြင့် ပြန်ဖြေပါသည်။','ตอบเป็นภาษาเมียนมา อังกฤษ หรือไทยตามภาษาที่คุณใช้'));
