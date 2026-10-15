@@ -8,7 +8,7 @@ const pick=(lang,en,my,th)=>({en,my,th}[lang]||en);
 export function infoIntent(text) {
  const t=text.trim();
  // Explicit task commands always keep their established handlers.
- if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|lab-pair)\b/i.test(t))return null;
+ if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|mastitis|milkquality|milking|lab-pair)\b/i.test(t))return null;
  if(/^\/(?:updates|version|changelog)(?:\s|$)/i.test(t))return 'updates';
  if(/^\/(?:help|start|capabilities)(?:\s|$)/i.test(t))return 'help';
  if(/\b(?:update|create|save|record|edit)\b.*\b(?:cow|milk|farm|record|sample)\b/i.test(t)&&! /\b(?:system|release|version|capabilities|features)\b/i.test(t))return null;
@@ -45,6 +45,10 @@ export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=
  'Dairy nutrition: ask questions from Dr. Walter Chen\'s 36 indexed nutrition slides. Use /nutrition followed by your question. Responses cite original slide numbers (slides 24 and 34 are excluded).',
  'နို့စားနွားအာဟာရ: Dr. Walter Chen ၏ စုစည်းထားသော သင်ခန်းစာ ၃၆ စာမျက်နှာကို /nutrition နောက်တွင် မေးခွန်းရေးပြီး မေးနိုင်ပါသည်။ မူရင်း Slide နံပါတ်များကို ကိုးကားပေးပါသည် (Slide 24 နှင့် 34 မပါဝင်ပါ)။',
  'โภชนาการโคนม: ถามจากสไลด์ 36 หน้าของ Dr. Walter Chen โดยพิมพ์ /nutrition ตามด้วยคำถาม คำตอบอ้างอิงหมายเลขสไลด์ต้นฉบับ (ไม่รวมสไลด์ 24 และ 34)'));
+ if(labConfigured)lines.push(say(
+ 'Milk quality and mastitis: 77 slides from Todd Meyer DVM (USGC Thailand, March 2024), indexed as visual source summaries. Ask /mastitis or /milkquality; answers cite the original slide number. Mastitis treatments need veterinary assessment.',
+ 'နို့အရည်အသွေးနှင့် နို့အုံရောင်ရမ်းရောဂါ: Dr. Todd Meyer ၏ သင်ခန်းစာ Slide ၇၇ ခုကို ပုံအခြေခံ အကျဉ်းချုပ်များအဖြစ် ထည့်ထားပါသည်။ /mastitis သို့မဟုတ် /milkquality ဖြင့် မေးနိုင်ပြီး မူရင်း Slide နံပါတ်ကို ကိုးကားပေးပါမည်။ ဆေးကုသမှုအတွက် တိရစ္ဆာန်ဆရာဝန် စစ်ဆေးမှုလိုအပ်ပါသည်။',
+ 'คุณภาพน้ำนมและเต้านมอักเสบ: เพิ่มสรุปจากภาพสไลด์ 77 หน้าของ Dr. Todd Meyer ถามด้วย /mastitis หรือ /milkquality คำตอบอ้างอิงเลขสไลด์ การรักษาต้องให้สัตวแพทย์ประเมิน'));
  if(privateLab)lines.push(say('This private chat is restricted to approved laboratory access. Use the connected group for farm records.','ဤ private chat သည် ခွင့်ပြုထားသော laboratory access အတွက်သာ ဖြစ်ပါသည်။ Farm records အတွက် ချိတ်ထားသော group ကို သုံးပါ။','แชตส่วนตัวนี้จำกัดเฉพาะสิทธิ์ห้องปฏิบัติการที่อนุมัติ ใช้กลุ่มที่เชื่อมต่อสำหรับข้อมูลฟาร์ม'));
  lines.push(privateLab?'/cvas Show Lab ID 39170011 dry matter and starch.': '/farm Farm 2 Cow 001\n/records Farm 4\n/photo Farm 2\n/cancel');
  lines.push(say('I respond in Myanmar, English or Thai to match your message.','မေးထားသောဘာသာစကားအလိုက် မြန်မာ၊ အင်္ဂလိပ်၊ ထိုင်းဘာသာဖြင့် ပြန်ဖြေပါသည်။','ตอบเป็นภาษาเมียนมา อังกฤษ หรือไทยตามภาษาที่คุณใช้'));
