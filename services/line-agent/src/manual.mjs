@@ -1,5 +1,13 @@
 export function nutritionRequest(text) {
- return /^\/(?:nutrition|feeding)(?:\s|$)/i.test(text)||/\b(?:dairy nutrition|dairy feeding|feed bunk|feed efficiency|dry matter intake|dmi|rumen|ruminal|ddgs|cow cooling|cow comfort|nutrient requirement|milk cow nutrition)\b|နွားအာဟာရ|အစာအာဟာရ|နို့စားနွားအစာ|အစာကျွေး|โภชนาการโคนม|การให้อาหารโคนม/i.test(text);
+ const q=String(text??'').trim();
+ if(/^\/(?:nutrition|feeding)(?:\s|$)/i.test(q))return true;
+ if(/\b(?:dairy nutrition|dairy feeding|feed bunk|feed efficiency|dry matter intake|dmi|rumen|ruminal|ddgs|cow cooling|cow comfort|nutrient requirement|milk cow nutrition)\b|နွားအာဟာရ|အစာအာဟာရ|နို့စားနွားအစာ|အစာကျွေး|โภชนาการโคนม|การให้อาหารโคนม/i.test(q))return true;
+ // Natural LINE questions about dairy-cow cooling should not fall into farm-record planning.
+ // Keep actual farm-record lookups and cooling of milk or equipment on their own routes.
+ const cowContext=/\b(?:dairy|cows?|cattle|herds?|milking|milk production|holding pens?|feedlines?|feed lines?)\b|နွား|โคนม|วัว/i.test(q);
+ const coolingTopic=/\b(?:soak(?:ing)?|sprinkl(?:ers?|ing)|sprays?|spraying|mist(?:ing)?|cool(?:ing|ed|s)?|fans?|ventilation|heat[\s-]?stress|thermal stress|shade|thi)\b|ရေဖြန်း|အအေးခံ|ပန်ကာ|အပူဒဏ်|พัดลม|สปริงเกลอร์|ลดความร้อน/i.test(q);
+ const recordLookup=/\b(?:Farm\s*[245]|Ryokusan)\b/i.test(q)&&/\b(?:records?|yesterday|date|recorded|logged|historical|last measurement)\b/i.test(q);
+ return cowContext&&coolingTopic&&!recordLookup;
 }
 export function manualRequest(text) {
  if(nutritionRequest(text))return true;
