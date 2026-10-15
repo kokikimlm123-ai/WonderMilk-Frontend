@@ -89,12 +89,18 @@ export class Google {
     if(!this.c.cvasIndex)throw new UserError('CVAS database is not connected yet.');
     if(this.cvasCached && Date.now()-this.cvasCached.at<300000)return this.cvasCached.data;
     const data=await json(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(this.c.cvasIndex)}?alt=media`,{headers:{authorization:`Bearer ${await this.token()}`}},8*1024*1024);
-    // Keep the existing CVAS reports and manuals read-only. Nutrition is bundled
-    // separately on this test branch, so no production Drive index is modified.
+    // Preserve the original private CVAS Drive index. Supplement the local
+    // knowledge library with bundled, read-only slide indexes in this release.
     if(data?.manuals!==undefined&&!Array.isArray(data.manuals))throw new Error('Invalid manual collection');
-    const nutritionManual=JSON.parse(await readFile(new URL('./nutrition-manual.json',import.meta.url),'utf8'));
-    if((data.manuals||[]).some(m=>m.id===nutritionManual.id))throw new Error('Duplicate nutrition manual ID');
-    const merged={...data,manuals:[...(data.manuals||[]),nutritionManual]};
+    const added=await Promise.all(['nutrition-manual.json','mastitis-manual.json'].map(
+      async filename=>JSON.parse(await readFile(new URL('./'+filename,import.meta.url),'utf8'))));
+    const manuals=[...(data.manuals||[])];
+    const existingIds=new Set(manuals.map(m=>m.id));
+    for(const manual of added){
+      if(!manual?.id||existingIds.has(manual.id)||!Array.isArray(manual.pages))throw new Error('Duplicate or invalid local manual');
+      existingIds.add(manual.id);manuals.push(manual);
+    }
+    const merged={...data,manuals};
     this.cvasCached={at:Date.now(),data:merged};return merged;
   }
   async sources(plan) {
