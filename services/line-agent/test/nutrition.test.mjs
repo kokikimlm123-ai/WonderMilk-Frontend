@@ -10,7 +10,7 @@ test('Nutrition presentation is indexed slide-by-slide without fabricated missin
  assert.equal(nutrition.pages.length,36);
  assert.deepEqual(nutrition.pages.map(p=>p.pdf_page),Array.from({length:38},(_,i)=>i+1).filter(n=>n!==24&&n!==34));
  assert.match(nutrition.pages.find(p=>p.pdf_page===10).text,/CP/);
- assert.match(nutrition.pages.find(p=>p.pdf_page===29).text,/Feed Bunk Management/);
+ assert.match(nutrition.pages.find(p=>p.pdf_page===29).text,/Feed Bunk\s+Management/);
  assert.equal(nutrition.pages.some(p=>p.pdf_page===24||p.pdf_page===34),false);
 });
 test('V1 routes nutrition questions without changing CVAS lab report routes',()=>{
