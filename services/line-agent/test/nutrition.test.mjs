@@ -7,11 +7,11 @@ const nutrition=JSON.parse(await readFile(new URL('../src/nutrition-manual.json'
 const index={schema_version:1,reports:[],manuals:[
  {id:'cvas-method',title:'CVAS Manual',pages:[{pdf_page:7,text:'Use the correct method.'}]},nutrition]};
 test('Nutrition presentation is indexed slide-by-slide without fabricated missing text',()=>{
- assert.equal(nutrition.pages.length,38);
- assert.deepEqual(nutrition.pages.map(p=>p.pdf_page),Array.from({length:38},(_,i)=>i+1));
- assert.match(nutrition.pages[9].text,/CP/);
- assert.match(nutrition.pages[28].text,/Feed Bunk Management/);
- assert.match(nutrition.pages[23].text,/Visual-only slide/);
+ assert.equal(nutrition.pages.length,36);
+ assert.deepEqual(nutrition.pages.map(p=>p.pdf_page),Array.from({length:38},(_,i)=>i+1).filter(n=>n!==24&&n!==34));
+ assert.match(nutrition.pages.find(p=>p.pdf_page===10).text,/CP/);
+ assert.match(nutrition.pages.find(p=>p.pdf_page===29).text,/Feed Bunk Management/);
+ assert.equal(nutrition.pages.some(p=>p.pdf_page===24||p.pdf_page===34),false);
 });
 test('V1 routes nutrition questions without changing CVAS lab report routes',()=>{
  for(const q of ['/nutrition DDGS','What is rumen degradable protein?','Dairy nutrition basics','နွားအာဟာရ','โภชนาการโคนม']) {
@@ -23,8 +23,9 @@ test('V1 routes nutrition questions without changing CVAS lab report routes',()=
 test('Nutrition answers cite only the nutrition slides and leave CVAS method separate',async()=>{
  const ai={call:async(prompt,input)=>{
   const evidence=JSON.parse(input[0].content[0].text);
-  assert.equal(evidence.pages.length,38);
+  assert.equal(evidence.pages.length,36);
   assert(evidence.pages.every(p=>p.id.startsWith('dairy-nutrition-walter-chen:')));
+  assert(evidence.pages.every(p=>![24,34].includes(p.pdf_page)));
   assert.match(prompt,/veterinary treatment/);
   return {answer:'Feed management guidance',cited_pages:['dairy-nutrition-walter-chen:29']};
  }};
