@@ -89,7 +89,13 @@ export class Google {
     if(!this.c.cvasIndex)throw new UserError('CVAS database is not connected yet.');
     if(this.cvasCached && Date.now()-this.cvasCached.at<300000)return this.cvasCached.data;
     const data=await json(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(this.c.cvasIndex)}?alt=media`,{headers:{authorization:`Bearer ${await this.token()}`}},8*1024*1024);
-    this.cvasCached={at:Date.now(),data};return data;
+    // Keep the existing CVAS reports and manuals read-only. Nutrition is bundled
+    // separately on this test branch, so no production Drive index is modified.
+    if(data?.manuals!==undefined&&!Array.isArray(data.manuals))throw new Error('Invalid manual collection');
+    const nutritionManual=JSON.parse(await readFile(new URL('./nutrition-manual.json',import.meta.url),'utf8'));
+    if((data.manuals||[]).some(m=>m.id===nutritionManual.id))throw new Error('Duplicate nutrition manual ID');
+    const merged={...data,manuals:[...(data.manuals||[]),nutritionManual]};
+    this.cvasCached={at:Date.now(),data:merged};return merged;
   }
   async sources(plan) {
     const result=[];const wanted=plan.type;const SOURCE_IDS=this.c.sourceIds;
