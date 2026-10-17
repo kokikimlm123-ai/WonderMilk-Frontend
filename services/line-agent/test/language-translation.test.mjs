@@ -54,7 +54,7 @@ test('Burmese history is per-group, bounded, expiring and withdrawn by unsend',t
  for(let i=0;i<45;i++)store.rememberBurmeseMessage(G,String(1000+i),'စာ '+i,now-45000+i*1000);
  assert.equal(store.db.prepare('SELECT count(*) n FROM group_burmese_text WHERE group_id=?').get(G).n,40);
 });
-test('Webhook captures only valid signed Burmese text in connected group, but does not queue unmentioned text',async t=>{
+test('Webhook captures signed Burmese group history, while unmentioned events stay silent',async t=>{
  const {store,dir}=tmp(t),secret='test-secret';
  const server=createApp({enabled:true,group:G,secret,pairing:''},store);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -73,7 +73,7 @@ test('Webhook captures only valid signed Burmese text in connected group, but do
  assert.equal(store.db.prepare('SELECT COUNT(*) n FROM group_burmese_text').get().n,0);
  assert.equal((await post([earlier])).status,200);
  assert.equal(store.db.prepare('SELECT COUNT(*) n FROM group_burmese_text').get().n,1);
- assert.equal(store.db.prepare('SELECT COUNT(*) n FROM events').get().n,0);
+ assert.equal(store.db.prepare('SELECT COUNT(*) n FROM events').get().n,1);
  assert.equal((await post([earlier])).status,200);
  assert.equal(store.db.prepare('SELECT COUNT(*) n FROM group_burmese_text').get().n,1);
  let captured=null;
@@ -85,7 +85,8 @@ test('Webhook captures only valid signed Burmese text in connected group, but do
  const bot=new Worker({dir,enabled:true,group:G},store,{},ai,{});
  const ask=group('100002','@WM Please translate the past Burmese text to English',Date.now());
  assert.equal((await post([ask])).status,200);
- await bot.process(store.next());
+ await bot.process(store.next()); // The previously unmentioned message is intentionally silent.
+ await bot.process(store.next()); // The explicit translation request receives the reply.
  assert.equal(captured,earlier.message.text);
  assert.equal(store.db.prepare("SELECT text FROM outgoing WHERE id='ev-100002'").get().text,'The farm received 50 kilograms of milk.');
  assert.equal(store.db.prepare('SELECT count(*) n FROM records').get().n,0);
