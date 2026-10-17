@@ -8,7 +8,7 @@ const pick=(lang,en,my,th)=>({en,my,th}[lang]||en);
 export function infoIntent(text) {
  const t=text.trim();
  // Explicit task commands always keep their established handlers.
- if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|mastitis|milkquality|milking|forage|forageguide|feedanalysis|lab-pair)\b/i.test(t))return null;
+ if(/^\/(?:farm|ask|add|edit|records|photo|cancel|cvas|nutrition|feeding|mastitis|milkquality|milking|forage|forageguide|feedanalysis|translate|lab-pair)\b/i.test(t))return null;
  if(/^\/(?:updates|version|changelog)(?:\s|$)/i.test(t))return 'updates';
  if(/^\/(?:help|start|capabilities)(?:\s|$)/i.test(t))return 'help';
  if(/\b(?:update|create|save|record|edit)\b.*\b(?:cow|milk|farm|record|sample)\b/i.test(t)&&! /\b(?:system|release|version|capabilities|features)\b/i.test(t))return null;
@@ -62,6 +62,10 @@ export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=
  'Translate an earlier Burmese LINE group message: mention the bot and ask "Please translate the past Burmese text to English". I can use only recent Burmese text received in this same connected group after this feature was enabled (up to 6 hours). For older, unavailable or unsent messages, please paste or quote the original text.',
  'ယခင် မြန်မာစာကို ဘာသာပြန်ရန် Bot ကို Mention လုပ်ပြီး "Please translate the past Burmese text to English" ဟု မေးပါ။ ဤလုပ်ဆောင်ချက် စတင်ပြီးနောက် Group တူတစ်ခုထဲမှာ ရရှိထားသော ၆ နာရီအတွင်း မြန်မာစာကိုသာ ပြန်ရှာနိုင်ပါသည်။ မရရှိနိုင်သောစာအတွက် မူရင်းစာကို ပြန်ပို့ပါ။',
  'หากต้องการแปลข้อความพม่าก่อนหน้า ให้กล่าวถึงบอทแล้วพิมพ์ "Please translate the past Burmese text to English" ระบบอ่านได้เฉพาะข้อความพม่าที่รับในกลุ่มเดียวกันหลังเปิดใช้ฟังก์ชันนี้ และย้อนหลังได้ไม่เกิน 6 ชั่วโมง ข้อความเก่าหรือข้อความที่ยกเลิกต้องส่งใหม่'));
+ lines.push(say(
+ 'Translate text directly: /translate en: [text], /translate th: [text], /translate my: [text], or /translate all: [text]. Supported source text: Myanmar, Thai and English. Translation is read-only; paste the full text after the command.',
+ 'စာသားကို တိုက်ရိုက်ဘာသာပြန်ရန် /translate en: [စာသား]၊ /translate th: [စာသား]၊ /translate my: [စာသား]၊ /translate all: [စာသား] ဟု ရေးပါ။ မြန်မာ၊ ထိုင်း၊ အင်္ဂလိပ်စာသားများကို ဘာသာပြန်နိုင်ပြီး စာရင်းအချက်အလက်များ မပြောင်းလဲပါ။',
+ 'แปลข้อความโดยตรง: /translate en: [ข้อความ], /translate th: [ข้อความ], /translate my: [ข้อความ] หรือ /translate all: [ข้อความ] รองรับต้นฉบับภาษาพม่า ไทย และอังกฤษ โดยไม่แก้ไขข้อมูลฟาร์ม'));
  lines.push(say(
  'To get one answer in three languages, append "Answer Myanmar, Thai & English". The answer is presented in Myanmar, Thai and English order. Longer answers may be split into multiple LINE messages.',
  'မေးခွန်းတစ်ခုကို ဘာသာစကား ၃ မျိုးဖြင့် ဖြေစေလိုပါက "Answer Myanmar, Thai & English" ဟု ထည့်ရေးပါ။ မြန်မာ၊ ထိုင်း၊ အင်္ဂလိပ် အစီအစဉ်အတိုင်း ဖြေပါမည်။ ရှည်သောအဖြေများကို LINE Message အများအပြားခွဲပို့နိုင်ပါသည်။',
