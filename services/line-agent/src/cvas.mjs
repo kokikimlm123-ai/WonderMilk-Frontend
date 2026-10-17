@@ -1,6 +1,6 @@
 import {languageInstruction} from './language.mjs';
 import {manualRequest,nutritionRequest,answerManual} from './manual.mjs';
-export function cvasRequest(text) { return manualRequest(text)||nutritionRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก/i.test(text); }
+export function cvasRequest(text) { return manualRequest(text)||nutritionRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก|玉米青贮|化验报告|实验室报告|检测报告|饲料检测/i.test(text); }
 export function validateIndex(data) {
  if(data?.schema_version!==1||!Array.isArray(data.reports)||data.reports.length>1000)throw new Error('Invalid CVAS index');
  const keys=new Set();
@@ -13,13 +13,13 @@ export function validateIndex(data) {
 export async function answerCvas(index,question,ai,language) {
  validateIndex(index);
  if(manualRequest(question))return answerManual(index,question,ai,language);
- if(/best|worst|rank|အကောင်းဆုံး|အဆိုးဆုံး|ดีที่สุด|แย่ที่สุด/i.test(question))return rankSamples(index,question,ai,language);
+ if(/best|worst|rank|အကောင်းဆုံး|အဆိုးဆုံး|ดีที่สุด|แย่ที่สุด|最好|最差|排名|比较/i.test(question))return rankSamples(index,question,ai,language);
  if(/\bpdfs?\b/i.test(question))return searchPdfs(index,question,ai,language);
  const exactIds=[...new Set(question.match(/\b\d{8}\b/g)||[])];
  if(exactIds.length) {
    const matched=index.reports.filter(r=>exactIds.includes(r.lab_id));
    const absent=exactIds.filter(id=>!matched.some(r=>r.lab_id===id));
-   if(absent.length)return ({my:'ဤ Lab ID မတွေ့ပါ: ',th:'ไม่พบ Lab ID: ',en:'Lab ID not found: '}[language]||'Lab ID not found: ')+absent.join(', ');
+   if(absent.length)return ({my:'ဤ Lab ID မတွေ့ပါ: ',th:'ไม่พบ Lab ID: ',zh:'未找到实验室编号：',en:'Lab ID not found: '}[language]||'Lab ID not found: ')+absent.join(', ');
    if(matched.length>4)return 'Please request at most four reports, including versions, at once.';
    return answerReports(index,question,matched,ai,language);
  }
@@ -36,11 +36,11 @@ async function answerReports(index,question,reports,ai,language) {
  if(Buffer.byteLength(JSON.stringify(reports))>53000)return 'Please request fewer reports at once (one or two Lab IDs).';
  const answer=await ai.answer(question,{database:'CVAS lab reports (read-only)',indexed_on:index.indexed_on,source_files:index.file_count,distinct_pdf_contents:index.report_count,selected_report_count:reports.length,scope:'Only these selected reports are evidence. Do not rank the whole database. Preserve column alignment and distinguish %DM, %CP and %NDF. Blank values are missing, never zero. Attribute numeric values to Lab ID and filename. Different versions must not be merged. Text extraction does not preserve bold wet-chemistry formatting, so do not infer analytical method from font. Do not treat feed analysis as daily farm milk/feed production.',reports},language);
  const links=originalPdfs({reports:originals}, originals.map(r=>r.lab_id).join(' '), language);
- return (language==='tri'?answer:answer.slice(0,3000))+'\n\n'+links;
+ return (['tri','quad'].includes(language)?answer:answer.slice(0,3000))+'\n\n'+links;
 }
 
 export function originalPdfs(index,question,language='en') {
- const say=(en,my,th)=>({en,my,th}[language]||en);
+ const say=(en,my,th,zh=en)=>({en,my,th,zh}[language]||en);
  const ids=[...new Set(question.match(/\b\d{8}\b/g)||[])];
  if(!ids.length)return say('Please specify a Lab ID, for example: /cvas pdf 39170011','Lab ID ထည့်ပေးပါ။ ဥပမာ: /cvas pdf 39170011','กรุณาระบุ Lab ID เช่น /cvas pdf 39170011');
  const reports=index.reports.filter(r=>ids.includes(r.lab_id));
@@ -75,7 +75,7 @@ async function searchPdfs(index,question,ai,language) {
  if(/\b\d{8}\b/.test(question))return originalPdfs(index,question,language);
  const found=await findReports(index,question,ai,language);
  if(found.clarification)return found.clarification;
- if(!found.reports.length)return ({my:'ကိုက်ညီသော PDF မတွေ့ပါ။ Naming code ကို ပြန်စစ်ပါ။',th:'ไม่พบ PDF ที่ตรงกัน กรุณาตรวจสอบรหัส',en:'No matching PDFs. Please check the naming code.'}[language]||'No matching PDFs.');
+ if(!found.reports.length)return ({my:'ကိုက်ညီသော PDF မတွေ့ပါ။ Naming code ကို ပြန်စစ်ပါ။',th:'ไม่พบ PDF ที่ตรงกัน กรุณาตรวจสอบรหัส',zh:'未找到符合条件的PDF，请核对命名代码。',en:'No matching PDFs. Please check the naming code.'}[language]||'No matching PDFs.');
  return `${found.reports.length} PDF(s)\n\n`+originalPdfs({reports:found.reports},found.reports.map(r=>r.lab_id).join(' '),language);
 }
 // Extract only the known two-column CVAS layout. Missing values remain null.
