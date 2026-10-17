@@ -59,8 +59,14 @@ export class Worker {
     for(const m of [...(e.message?.mention?.mentionees||[])].filter(m=>m.isSelf===true).sort((a,b)=>b.index-a.index))
       if(Number.isInteger(m.index)&&Number.isInteger(m.length))text=text.slice(0,m.index)+text.slice(m.index+m.length);
     text=text.trim();
-    const called=text.match(/^@(Wonder Milk Farm AI|WM)(?=\s|$)/i);
-    if(called){mention=true;text=text.slice(called[0].length).trim();}
+    // LINE metadata strips real @mentions above. Some clients can leave an
+    // additional literal alias (or duplicate mention) before the actual command.
+    // Only strip known names at the beginning of the message, never from source text.
+    for(let i=0;i<3;i++){
+      const called=text.match(/^@(?:Wonder Milk Farm AI|WM|ARGO[-–—]WM\s+Farm\s+AIRobot)(?=\s|$)/i);
+      if(!called)break;
+      mention=true;text=text.slice(called[0].length).trim();
+    }
 
     if(!bound) {
       if(text.startsWith('/pair ')&&e.source.userId&&this.store.bind(group,text.slice(6).trim(),this.c.pairing)) {
