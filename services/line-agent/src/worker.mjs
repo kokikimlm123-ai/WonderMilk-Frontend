@@ -10,6 +10,7 @@ import {UserError,validDate} from './core.mjs';
 import {RemoteError} from './integrations.mjs';
 
 export const HELP=`Wonder Milk Farm AI\nFarm 2 • Farm 4 • Ryokusan\nအဖွဲ့ဝင်အားလုံး မေး/သွင်း/ပြင်နိုင်ပါတယ်။\n\n/farm Farm 2 Cow 001 အချက်အလက်ပြပါ\n/farm Farm 4 2026-09-15 နေ့စုစုပေါင်းနို့ 850 kg စာရင်းသွင်းပါ\n/records Farm 4 — Bot စာရင်းနှင့် Record ID ရှာရန်\n/photo Farm 2 — နောက်ပို့မည့်ဖောင်၏ Farm သတ်မှတ်ရန်\nဖောင်ဓာတ်ပုံ ပို့နိုင်ပါတယ်။ မရှင်းလင်းသည့်အချက်ကို ပြန်မေးပါမယ်။\n/cancel — မပြီးသေးသောဖောင်ကို ရပ်ရန်\n\nမူလဖိုင်တွေကို ရှာဖတ်နိုင်ပြီး Bot ကသွင်းထားသောစာရင်းတွေကို ပြင်နိုင်ပါတယ်။ မူလဖိုင် row တွေကို တိုက်ရိုက်မပြင်သေးပါ။`;
+export const HELP_ZH='ARGO-WM V1.1 开发版本。已支持简体中文问题与 CVAS 手册查询。翻译：/translate zh: [内容]，/translate en: [内容]，/translate my: [内容]，/translate th: [内容]；/translate all 保持原有三种语言，/translate four 输出缅甸语、泰语、英语和简体中文。此版本仍处于测试阶段，不代表已上线。';
 const photoName=(g,m)=>createHash('sha256').update(g+':'+m).digest('hex')+'.image';
 function farmIn(text){const t=text.trim().toLowerCase().replace(/\s+/g,' ');return FARMS.find(f=>t===f.toLowerCase()||t===(f==='Ryokusan'?'ryokusan farm':f.replace(' ', '').toLowerCase()));}
 export function replyLanguage(text,fallback='en'){
@@ -82,7 +83,7 @@ export class Worker {
     if(e.message.type==='text'&&!mention){this.store.finish(job.id);return;}
     if(e.message.type==='image'&&!this.store.draft(actor)?.image_requested){this.store.finish(job.id);return;}
     if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.out(job.id,group,'စာပို့ပြီး အချိန်ကြာသွားလို့ အလိုအလျောက်မသိမ်းပါ။ ပြန်ပို့ပေးပါ။');this.store.finish(job.id);return;}
-    if(text==='/help'||text==='/start'){this.store.out(job.id,group,HELP);this.store.finish(job.id);return;}
+    if(text==='/help'||text==='/start'||text==='/help zh'||text==='帮助'){this.store.out(job.id,group,/[\u3400-\u4dbf\u4e00-\u9fff]|\bzh\b/u.test(text)?HELP_ZH:HELP);this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
     const translation=directTranslationRequest(text);
     if(translation){
