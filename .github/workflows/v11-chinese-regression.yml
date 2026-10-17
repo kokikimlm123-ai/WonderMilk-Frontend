@@ -1,0 +1,23 @@
+name: V1.1 Chinese Compatibility Regression
+on:
+  push:
+    branches:
+      - argo-wm-v11-chinese-20261017
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install openpyxl==3.1.5
+      - name: Regression tests
+        working-directory: services/line-agent
+        env:
+          PYTHON_BIN: python
+        run: npm test
