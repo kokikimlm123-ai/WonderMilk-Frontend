@@ -21,6 +21,20 @@ export function infoIntent(text) {
  return null;
 }
 export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=false}={}) {
+ if(language==='quad')return ['မြန်မာ\n'+infoAnswer(intent,'my',{privateLab,labConfigured}),
+  'ไทย\n'+infoAnswer(intent,'th',{privateLab,labConfigured}),
+  'English\n'+infoAnswer(intent,'en',{privateLab,labConfigured}),
+  '简体中文\n'+infoAnswer(intent,'zh',{privateLab,labConfigured})].join('\n\n');
+ if(language==='zh'){
+  if(intent==='updates')return 'ARGO-WM 更新信息：本信息仅为已核实版本概要，不代表全部最新部署记录。请以 GitHub 和 Railway 的实际部署日志为准。';
+  const intro='ARGO-WM 使用说明（简体中文）';
+  const access=privateLab?'此私聊仅适用于已授权的实验室账户。':'在已连接的 LINE 群组中，请 @ 提及 ARGO-WM 后提问。支持 Farm 2、Farm 4 和 Ryokusan 的现有记录查询与汇总；可按明确提供的数据创建记录，并在权限允许时修改机器人创建的记录。';
+  const lab=labConfigured?'可查询 CVAS 实验室报告和原始 PDF 文件名，并根据所提供的实验室手册、乳牛营养、乳房炎及青贮饲料分析资料回答问题，附上来源页码。':'实验室资料功能取决于已连接的数据源。';
+  return [intro,access,lab,
+   '翻译：/translate zh: 缅甸语或英语文本；/translate en、/translate my、/translate th；/translate all 保持原来的三种语言；/translate four 或 /translate all4 输出缅甸语、泰语、英语和简体中文。',
+   '如需用中文回答，请用中文提问或在问题末尾加上 Answer in Chinese。具体数值与医疗建议必须以可用资料为准。'].join('\n\n');
+ }
+
  if(language==='tri')return ['မြန်မာ\n'+infoAnswer(intent,'my',{privateLab,labConfigured}),
   'ไทย\n'+infoAnswer(intent,'th',{privateLab,labConfigured}),
   'English\n'+infoAnswer(intent,'en',{privateLab,labConfigured})].join('\n\n');
