@@ -69,7 +69,7 @@ export function start() {
       }catch(e){store.set('cvas_smoke_v2','failed');console.error(JSON.stringify({cvas_smoke:'failed',error_type:e.name,status:e.status,service:e.service,detail:e.name==='UserError'?e.message:undefined}));}
     }
   }).catch(()=>console.error("cvas_source_unavailable"));
-  worker.manualImages.render(29).then(images=>console.log(JSON.stringify({manual_images:'ready',printed_page:29,pdf_viewer_page:30,original_bytes:images.original.length,preview_bytes:images.preview.length}))).catch(()=>console.error('manual_images_warmup_failed'));
+  worker.manualImages.render(29).then(images=>console.log(JSON.stringify({manual_images:'ready',printed_page:29,pdf_viewer_page:30,original_bytes:images.original.length,preview_bytes:images.preview.length}))).catch(e=>console.error(JSON.stringify({manual_images:'warmup_failed',reason:['Exactly one CVAS source manual required','Private manual source missing','Manual version mismatch','Invalid rendered image'].includes(e.message)?e.message:'source_or_renderer',service:e.service,status:e.status,code:e.code})));
   const server=createApp(c,store,worker.manualImages),timer=setInterval(()=>worker.tick().catch(()=>console.error('worker_error')),1000);
   server.listen(c.port,'0.0.0.0',()=>console.log(JSON.stringify({status:'listening',port:c.port,enabled:c.enabled,missing:missingConfiguration(c)})));
   const stop=()=>{clearInterval(timer);server.close();const end=setInterval(()=>{if(!worker.running){clearInterval(end);store.close();process.exit(0);}},100);setTimeout(()=>process.exit(1),55000).unref();};
