@@ -66,6 +66,13 @@ export class Store {
       CREATE TABLE IF NOT EXISTS operations(event TEXT PRIMARY KEY,result TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS outgoing(id TEXT PRIMARY KEY,group_id TEXT NOT NULL,text TEXT NOT NULL,retry_key TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'queued',created INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_attempt INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS usage(day TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,input_tokens INTEGER NOT NULL DEFAULT 0,output_tokens INTEGER NOT NULL DEFAULT 0);
+      -- Group history is a short-lived, per-group cache of Burmese messages, never a whole LINE archive.
+      CREATE TABLE IF NOT EXISTS group_burmese_text(
+        message_id TEXT PRIMARY KEY,group_id TEXT NOT NULL,text TEXT NOT NULL,
+        sent_at INTEGER NOT NULL,received_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS group_burmese_recent ON group_burmese_text(group_id,sent_at DESC);
+      CREATE TABLE IF NOT EXISTS group_burmese_unsent(
+        message_id TEXT PRIMARY KEY,received_at INTEGER NOT NULL);
     `);
     // One process and one replica only; committed operations remain idempotent on replay.
     this.db.prepare("UPDATE events SET status='queued' WHERE status='processing'").run();
@@ -73,6 +80,38 @@ export class Store {
   close(){this.db.close();}
   setting(k){return this.db.prepare('SELECT value FROM settings WHERE key=?').get(k)?.value;}
   set(k,v){this.db.prepare('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k,v);}
+  rememberBurmeseMessage(group,messageId,sourceText,sentAt=Date.now()) {
+    if(typeof group!=='string'||!/^C[A-Za-z0-9]{10,}$/.test(group)||
+       typeof messageId!=='string'||!/^[0-9]{1,80}$/.test(messageId)||
+       typeof sourceText!=='string'||!/[\u1000-\u109f]/u.test(sourceText)||
+       sourceText.length>3000||!Number.isFinite(sentAt))return false;
+    const now=Date.now(),cutoff=now-6*3600*1000;
+    if(sentAt>now+2*60*1000||sentAt<cutoff)return false;
+    this.db.prepare('DELETE FROM group_burmese_text WHERE received_at<?').run(cutoff);
+    this.db.prepare('DELETE FROM group_burmese_unsent WHERE received_at<?').run(now-7*86400000);
+    if(this.db.prepare('SELECT 1 FROM group_burmese_unsent WHERE message_id=?').get(messageId))return false;
+    this.db.prepare('INSERT OR IGNORE INTO group_burmese_text(message_id,group_id,text,sent_at,received_at) VALUES(?,?,?,?,?)')
+      .run(messageId,group,sourceText,sentAt,now);
+    this.db.prepare('DELETE FROM group_burmese_text WHERE group_id=? AND message_id NOT IN (SELECT message_id FROM group_burmese_text WHERE group_id=? ORDER BY sent_at DESC,received_at DESC LIMIT 40)')
+      .run(group,group);
+    return true;
+  }
+  forgetBurmeseMessage(group,messageId) {
+    if(typeof group!=='string'||!/^C[A-Za-z0-9]{10,}$/.test(group)||
+       typeof messageId!=='string'||!/^[0-9]{1,80}$/.test(messageId))return;
+    this.db.prepare('INSERT OR IGNORE INTO group_burmese_unsent(message_id,received_at) VALUES(?,?)').run(messageId,Date.now());
+    this.db.prepare('DELETE FROM group_burmese_text WHERE message_id=? AND group_id=?').run(messageId,group);
+  }
+  recentBurmeseMessage(group,{before=Date.now(),excludeId='',quotedId=''}={}) {
+    const cutoff=Date.now()-6*3600*1000;
+    if(quotedId){
+      const q=this.db.prepare('SELECT text,message_id,sent_at FROM group_burmese_text WHERE group_id=? AND message_id=? AND sent_at<=? AND received_at>=?')
+        .get(group,quotedId,before,cutoff);
+      return q||null;
+    }
+    return this.db.prepare('SELECT text,message_id,sent_at FROM group_burmese_text WHERE group_id=? AND message_id<>? AND sent_at<=? AND received_at>=? ORDER BY sent_at DESC,received_at DESC LIMIT 1')
+      .get(group,excludeId,before,cutoff)||null;
+  }
   bind(group,code,configuredCode) {
     if(this.setting('group'))return this.setting('group')===group;
     if(configuredCode.length<24||!sameSecret(code,configuredCode))return false;
