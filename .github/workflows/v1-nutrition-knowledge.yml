@@ -5,6 +5,7 @@ on:
       - argo-wm-v1-nutrition-knowledge-20261015
       - argo-wm-v1-mastitis-knowledge-20261015
       - argo-wm-v1-forage-analysis-guide-20261015
+      - argo-wm-v1-group-translation-multilingual-20261017
   workflow_dispatch:
 jobs:
   test:
@@ -18,7 +19,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install openpyxl==3.1.5
-      - name: Test V1 farm CVAS nutrition mastitis and forage PDF routes
+      - name: Test V1 farm CVAS knowledge and multilingual LINE workflows
         working-directory: services/line-agent
         env:
           PYTHON_BIN: python
