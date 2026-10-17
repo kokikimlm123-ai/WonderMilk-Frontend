@@ -191,6 +191,8 @@ export class Worker {
   }
   async clean() {
     this.store.db.prepare('DELETE FROM drafts WHERE expires<?').run(Date.now());
+    this.store.db.prepare('DELETE FROM group_burmese_text WHERE received_at<?').run(Date.now()-6*3600*1000);
+    this.store.db.prepare('DELETE FROM group_burmese_unsent WHERE received_at<?').run(Date.now()-7*86400000);
     // Retain business records/audit. Drop delivered message text after seven days.
     this.store.db.prepare("UPDATE outgoing SET text='' WHERE status IN ('sent','cancelled') AND created<?").run(Date.now()-7*86400000);
     const dir=join(this.c.dir,'photos');
