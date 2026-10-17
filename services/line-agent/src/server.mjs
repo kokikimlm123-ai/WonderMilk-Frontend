@@ -31,7 +31,7 @@ export function createApp(c,store) {
       if(!c.enabled)return send(res,503,{error:'bot_paused'});
       const bound=c.group||store.setting('group');
       // Only persist limited Burmese text AFTER signed LINE verification and group binding.
-      // Unmentioned group messages are not queued, replied to, or sent to OpenAI.
+      // Unmentioned group messages keep the existing silent worker behavior and are never sent to OpenAI.
       if(bound)for(const e of body.events) {
         if(e?.source?.type!=='group'||e.source.groupId!==bound)continue;
         if(e.type==='message'&&e.message?.type==='text')
@@ -40,10 +40,7 @@ export function createApp(c,store) {
           store.forgetBurmeseMessage(bound,e.unsend.messageId);
       }
       const events=body.events.filter(e=>privateLabEvent(c,store,e)||(e?.source?.type==='group'&&(
-
-        bound?(e.source.groupId===bound&&
-          (e.type!=='message'||e.message?.type!=='text'||e.message.mention?.mentionees?.some(m=>m.isSelf===true)||/^@(Wonder Milk Farm AI|WM)(?=\s|$)/i.test(e.message?.text||''))):
-          e.type==='message'&&e.source.userId&&e.message?.type==='text'&&e.message.text?.startsWith('/pair ')&&sameSecret(e.message.text.slice(6).trim(),c.pairing)
+        bound?e.source.groupId===bound:e.type==='message'&&e.source.userId&&e.message?.type==='text'&&e.message.text?.startsWith('/pair ')&&sameSecret(e.message.text.slice(6).trim(),c.pairing)
       )));
       const pending=store.db.prepare("SELECT COUNT(*) AS n FROM events WHERE status IN ('queued','processing')").get().n;
       if(pending+events.length>200)return send(res,503,{error:'queue_full'});
