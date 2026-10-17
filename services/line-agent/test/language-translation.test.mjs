@@ -146,6 +146,8 @@ test('LINE text splitter preserves full multilingual message and does not silent
  assert.equal(pieces.join(''),original);
  assert.throws(()=>splitLineText('x'.repeat(24000)),/exceeds_five/);
  const help=infoAnswer('help','tri',{labConfigured:false});
- assert(help.indexOf('မြန်မာ')<help.indexOf('ไทย'));
- assert(help.indexOf('ไทย')<help.indexOf('English'));
+ assert(help.startsWith('မြန်မာ\n'));
+ assert(help.includes('\n\nไทย\n'));
+ assert(help.includes('\n\nEnglish\n'));
+ assert(help.indexOf('\n\nไทย\n')<help.indexOf('\n\nEnglish\n'));
 });
