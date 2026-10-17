@@ -6,6 +6,7 @@ on:
       - argo-wm-v1-mastitis-knowledge-20261015
       - argo-wm-v1-forage-analysis-guide-20261015
       - argo-wm-v1-group-translation-multilingual-20261017
+      - argo-wm-v1-translation-natural-intent-20261017
   workflow_dispatch:
 jobs:
   test:
