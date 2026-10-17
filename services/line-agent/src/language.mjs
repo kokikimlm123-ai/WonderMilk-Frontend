@@ -1,7 +1,7 @@
 // Explicit language requests are separate from the input language used for clarifications.
 export function wantsThreeLanguages(value) {
  const q=String(value??'');
- const requested=/(?:\b(?:answer|reply|respond|explain|write|translate|languages?|in)\b|ဘာသာ|ဖြေ|ပြန်|ตอบ|ภาษา|แปล)/i.test(q);
+ const requested=/(?:\b(?:answer|reply|respond|translate|languages?)\b|ဘာသာ|ဖြေ|ပြန်|ตอบ|ภาษา|แปล)/i.test(q);
  return requested &&
    /(?:\b(?:myanmar|burmese)\b|မြန်မာ|พม่า)/i.test(q) &&
    /(?:\bthai\b|ထိုင်း|ไทย)/i.test(q) &&
