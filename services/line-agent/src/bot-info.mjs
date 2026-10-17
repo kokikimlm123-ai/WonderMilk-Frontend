@@ -58,6 +58,14 @@ export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=
  'การอ่านผลวิเคราะห์อาหารหยาบ: คู่มือ Cornell Precision Feed Manager แบบ PDF 2 หน้าอธิบายค่าเป้าหมาย DM, CP, NDF/NDFD, แป้ง, แร่ธาตุ, พลังงานและการหมัก ถามด้วย /forage คำตอบอ้างอิงหน้า PDF 1 หรือ 2 เป้าหมายในคู่มือไม่ใช่ผลตรวจ CVAS จริง'));
  if(privateLab)lines.push(say('This private chat is restricted to approved laboratory access. Use the connected group for farm records.','ဤ private chat သည် ခွင့်ပြုထားသော laboratory access အတွက်သာ ဖြစ်ပါသည်။ Farm records အတွက် ချိတ်ထားသော group ကို သုံးပါ။','แชตส่วนตัวนี้จำกัดเฉพาะสิทธิ์ห้องปฏิบัติการที่อนุมัติ ใช้กลุ่มที่เชื่อมต่อสำหรับข้อมูลฟาร์ม'));
  lines.push(privateLab?'/cvas Show Lab ID 39170011 dry matter and starch.': '/farm Farm 2 Cow 001\n/records Farm 4\n/photo Farm 2\n/cancel');
+ if(!privateLab)lines.push(say(
+ 'Translate an earlier Burmese LINE group message: mention the bot and ask "Please translate the past Burmese text to English". I can use only recent Burmese text received in this same connected group after this feature was enabled (up to 6 hours). For older, unavailable or unsent messages, please paste or quote the original text.',
+ 'ယခင် မြန်မာစာကို ဘာသာပြန်ရန် Bot ကို Mention လုပ်ပြီး "Please translate the past Burmese text to English" ဟု မေးပါ။ ဤလုပ်ဆောင်ချက် စတင်ပြီးနောက် Group တူတစ်ခုထဲမှာ ရရှိထားသော ၆ နာရီအတွင်း မြန်မာစာကိုသာ ပြန်ရှာနိုင်ပါသည်။ မရရှိနိုင်သောစာအတွက် မူရင်းစာကို ပြန်ပို့ပါ။',
+ 'หากต้องการแปลข้อความพม่าก่อนหน้า ให้กล่าวถึงบอทแล้วพิมพ์ "Please translate the past Burmese text to English" ระบบอ่านได้เฉพาะข้อความพม่าที่รับในกลุ่มเดียวกันหลังเปิดใช้ฟังก์ชันนี้ และย้อนหลังได้ไม่เกิน 6 ชั่วโมง ข้อความเก่าหรือข้อความที่ยกเลิกต้องส่งใหม่'));
+ lines.push(say(
+ 'To get one answer in three languages, append "Answer Myanmar, Thai & English". The answer is presented in Myanmar, Thai and English order. Longer answers may be split into multiple LINE messages.',
+ 'မေးခွန်းတစ်ခုကို ဘာသာစကား ၃ မျိုးဖြင့် ဖြေစေလိုပါက "Answer Myanmar, Thai & English" ဟု ထည့်ရေးပါ။ မြန်မာ၊ ထိုင်း၊ အင်္ဂလိပ် အစီအစဉ်အတိုင်း ဖြေပါမည်။ ရှည်သောအဖြေများကို LINE Message အများအပြားခွဲပို့နိုင်ပါသည်။',
+ 'หากต้องการคำตอบ 3 ภาษา ให้เพิ่ม "Answer Myanmar, Thai & English" ในคำถาม ระบบจะตอบตามลำดับ พม่า ไทย อังกฤษ และอาจแบ่งข้อความที่ยาวเป็นหลายข้อความใน LINE'));
  lines.push(say('I respond in Myanmar, English or Thai to match your message.','မေးထားသောဘာသာစကားအလိုက် မြန်မာ၊ အင်္ဂလိပ်၊ ထိုင်းဘာသာဖြင့် ပြန်ဖြေပါသည်။','ตอบเป็นภาษาเมียนมา อังกฤษ หรือไทยตามภาษาที่คุณใช้'));
  return lines.join('\n\n');
 }
