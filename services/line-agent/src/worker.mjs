@@ -1,3 +1,4 @@
+import {ManualImages,manualImageRequest} from './manual-images.mjs';
 import {infoIntent,infoAnswer} from './bot-info.mjs';
 import {answerLanguage,languageInstruction,pastBurmeseTranslationRequest,translationTarget,directTranslationRequest} from './language.mjs';
 import {labAllowed,canPairLab} from './lab-access.mjs';
@@ -28,6 +29,7 @@ async function translateSource(ai,source,target) {
 }
 export class Worker {
   constructor(c,store,google,ai,line){Object.assign(this,{c,store,google,ai,line});this.running=false;this.lastSync=0;this.lastClean=0;}
+  get manualImages(){return this._manualImages??=new ManualImages(this.c,this.store,this.google);}
   async process(job) {
     const e=JSON.parse(job.payload),group=e.source?.groupId,actor=`${group}:${e.source?.userId||''}`;
     if(e.source?.type==='user') {
@@ -35,6 +37,11 @@ export class Worker {
       if(canPairLab(this.c,this.store,e))this.store.set('lab_owner',user);
       if(!labAllowed(this.c,this.store,user)||e.type!=='message'||e.message?.type!=='text'){this.store.finish(job.id);return;}
       let request=(e.message.text||'').trim().replace(/^@(Wonder Milk Farm AI|WM)\s+/i,'');
+      const imageRequest=manualImageRequest(request);
+      if(imageRequest){
+        if(Date.now()-Number(e.timestamp)<=15*60*1000)await this.manualImages.queue(job,user,user,imageRequest,replyLanguage(request));
+        this.store.finish(job.id);return;
+      }
       const direct=directTranslationRequest(request);
       if(direct){
         this.store.out(job.id,user,direct.source
@@ -91,9 +98,11 @@ export class Worker {
     }
     if(e.type!=='message'||!e.source.userId||this.store.setting('group_paused')==='true'){this.store.finish(job.id);return;}
     if(!['text','image'].includes(e.message.type)){this.store.finish(job.id);return;}
-    if(e.message.type==='text'&&!mention){this.store.finish(job.id);return;}
+    if(e.message.type==='text'&&!mention&&!/^\/manual\s+(?:pdf\s+)?(?:page|စာမျက်နှာ|หน้า)/i.test(text)){this.store.finish(job.id);return;}
     if(e.message.type==='image'&&!this.store.draft(actor)?.image_requested){this.store.finish(job.id);return;}
     if(Date.now()-Number(e.timestamp)>15*60*1000){this.store.out(job.id,group,'စာပို့ပြီး အချိန်ကြာသွားလို့ အလိုအလျောက်မသိမ်းပါ။ ပြန်ပို့ပေးပါ။');this.store.finish(job.id);return;}
+    const imageRequest=manualImageRequest(text);
+    if(imageRequest){await this.manualImages.queue(job,group,e.source.userId,imageRequest,replyLanguage(text));this.store.finish(job.id);return;}
     const info=infoIntent(text);
     if(info){this.store.out(job.id,group,infoAnswer(info,answerLanguage(replyLanguage(text),text),{labConfigured:!!this.c.cvasIndex}));this.store.finish(job.id);return;}
     if(text==='/cancel'){this.store.clearDraft(actor);this.store.out(job.id,group,'မပြီးသေးသောဖောင်ကို ရပ်ထားပါပြီ။');this.store.finish(job.id);return;}
@@ -210,6 +219,7 @@ export class Worker {
           catch(e){this.store.db.prepare("UPDATE outgoing SET attempts=attempts+1,next_attempt=?,status=CASE WHEN attempts>=9 OR created<? THEN 'failed' ELSE 'queued' END WHERE id=?").run(Date.now()+Math.min(300,2**outgoing.attempts)*1000,Date.now()-23*3600000,outgoing.id);}
         }
       }
+      if(this._manualImages)await this._manualImages.tick(this.line);
       if(Date.now()-this.lastClean>600000){this.lastClean=Date.now();await this.clean();}
     }finally{this.running=false;}
   }

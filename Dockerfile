@@ -1,5 +1,5 @@
 FROM node:24-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates gosu && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates gosu poppler-utils fonts-urw-base35 fonts-liberation && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /opt/xlsx && /opt/xlsx/bin/pip install --no-cache-dir openpyxl==3.1.5
 ENV PYTHON_BIN=/opt/xlsx/bin/python DATA_DIR=/data NODE_ENV=production
 WORKDIR /app

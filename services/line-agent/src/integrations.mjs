@@ -105,6 +105,15 @@ export class Google {
     const merged={...data,manuals};
     this.cvasCached={at:Date.now(),data:merged};return merged;
   }
+  async manualPdf() {
+    const index=await this.cvasIndex();
+    const manuals=(index.manuals||[]).filter(m=>/CVAS.*Manual|Manual.*CVAS/i.test(m.title||''));
+    if(manuals.length!==1)throw new Error('Exactly one CVAS source manual required');
+    const id=manuals[0].original_pdf_url?.match(/^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)\/view$/)?.[1];
+    if(!id)throw new Error('Private manual source missing');
+    const {bytes}=await response(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`,{headers:{authorization:`Bearer ${await this.token()}`}},8*1024*1024);
+    return bytes;
+  }
   async sources(plan) {
     const result=[];const wanted=plan.type;const SOURCE_IDS=this.c.sourceIds;
     if(plan.farms.includes('Ryokusan')&&SOURCE_IDS.ryokusan) {
@@ -219,8 +228,11 @@ export class Line {
     return {bytes,mime};
   }
   async send(group,text,retryKey) {
+    return this.sendMessages(group,splitLineText(text).map(content=>({type:'text',text:content})),retryKey);
+  }
+  async sendMessages(group,messages,retryKey) {
     if(!/^C[A-Za-z0-9]+$/.test(group)&&!/^U[0-9a-f]{32}$/i.test(group))throw new Error('Invalid LINE group ID');
-    const res=await fetch('https://api.line.me/v2/bot/message/push',{method:'POST',signal:AbortSignal.timeout(15000),headers:{authorization:`Bearer ${this.c.token}`,'content-type':'application/json','X-Line-Retry-Key':retryKey},body:JSON.stringify({to:group,messages:splitLineText(text).map(content=>({type:'text',text:content}))})});
+    const res=await fetch('https://api.line.me/v2/bot/message/push',{method:'POST',signal:AbortSignal.timeout(15000),headers:{authorization:`Bearer ${this.c.token}`,'content-type':'application/json','X-Line-Retry-Key':retryKey},body:JSON.stringify({to:group,messages})});
     if(!res.ok&&res.status!==409)throw new RemoteError('LINE push',res.status);
   }
 }
