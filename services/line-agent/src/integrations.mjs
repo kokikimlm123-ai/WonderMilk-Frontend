@@ -162,7 +162,7 @@ export class AI {
     if(Buffer.byteLength(instructions+textOnly)>65000)throw new UserError('အချက်အလက်များနေပါတယ်။ Farm၊ Cow ID သို့မဟုတ် ရက်စွဲအပိုင်းကို သတ်မှတ်မေးပါ။');
     const day=bangkokDate();
     if(!this.store.takeAiCall(day,this.c.maxCalls))throw new UserError('ယနေ့သတ်မှတ်ထားသော AI အသုံးပြုမှု ပြည့်ပါပြီ။');
-    const data=await json('https://api.openai.com/v1/responses',{method:'POST',headers:{authorization:`Bearer ${this.c.aiKey}`,'content-type':'application/json'},body:JSON.stringify({model:this.c.model,instructions,input,store:false,reasoning:{effort:'none'},max_output_tokens:schema?5500:1500,...(schema?{text:{format:{type:'json_schema',name:'farm_plan',strict:true,schema}}}:{})})},2*1024*1024);
+    const data=await json('https://api.openai.com/v1/responses',{method:'POST',headers:{authorization:`Bearer ${this.c.aiKey}`,'content-type':'application/json'},body:JSON.stringify({model:this.c.model,instructions,input,store:false,reasoning:{effort:'none'},max_output_tokens:schema?5500:3000,...(schema?{text:{format:{type:'json_schema',name:'farm_plan',strict:true,schema}}}:{})})},2*1024*1024);
     this.store.addUsage(day,data.usage);
     if(data.status!=='completed')throw new UserError('AI ဖတ်ရှုမှု မပြီးဆုံးပါ။ ဖောင်ကို အပိုင်းငယ်ခွဲပြီး ပြန်ပို့ပါ။');
     const parts=data.output?.flatMap(x=>x.content||[])||[];
