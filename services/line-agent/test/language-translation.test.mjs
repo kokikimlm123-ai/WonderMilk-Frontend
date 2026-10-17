@@ -7,7 +7,7 @@ import {createHmac} from 'node:crypto';
 import {Store} from '../src/core.mjs';
 import {createApp} from '../src/server.mjs';
 import {Worker} from '../src/worker.mjs';
-import {answerLanguage,wantsThreeLanguages,pastBurmeseTranslationRequest,translationTarget} from '../src/language.mjs';
+import {answerLanguage,wantsThreeLanguages,pastBurmeseTranslationRequest,translationTarget,directTranslationRequest} from '../src/language.mjs';
 import {splitLineText} from '../src/line-text.mjs';
 import {infoAnswer} from '../src/bot-info.mjs';
 import {answerManual} from '../src/manual.mjs';
@@ -137,6 +137,43 @@ test('Farm Q&A keeps Myanmar comprehension but delivers 3-language answer when r
  const evt=group('200030','@WM Farm 2 နို့စုစုပေါင်း ဘယ်လောက်လဲ။ Answer Myanmar Thai and English',Date.now());
  store.enqueue([evt]);await bot.process(store.next());
  assert.equal(plans,1);assert.equal(ans,1);
+});
+test('Explicit translation commands and natural prompts extract real source text, not farm data',()=>{
+ for(const [q,target,source] of [
+  ['/translate en: မင်္ဂလာပါ','en','မင်္ဂလာပါ'],
+  ['/translate th Hello farm team','th','Hello farm team'],
+  ['/translate my: สวัสดี','my','สวัสดี'],
+  ['/translate all: Farm 2 milk is 50 kg','tri','Farm 2 milk is 50 kg'],
+  ['Translate to English:\nနို့ ၅၀ ကီလိုဂရမ်','en','နို့ ၅၀ ကီလိုဂရမ်'],
+  ['Translate this Burmese text to Thai:\nနွားနို့','th','နွားနို့'],
+  ['Translate to three languages:\nMilk quality','tri','Milk quality'],
+  ['ဒီစာကို ထိုင်းလို ဘာသာပြန်ပေးပါ:\nနို့အုံရောင်','th','နို့အုံရောင်'],
+  ['แปลเป็นภาษาอังกฤษ:\nสวัสดี','en','สวัสดี'],
+ ])assert.deepEqual(directTranslationRequest(q),{target,source},q);
+ assert.deepEqual(directTranslationRequest('/translate th'),{target:'th',source:''});
+ assert.equal(directTranslationRequest('Explain DM and starch for corn silage'),null);
+ assert.equal(directTranslationRequest('Please translate the past Burmese text to English'),null);
+});
+test('LINE mentioned direct translation is read-only and respects the requested target',async t=>{
+ const {store,dir}=tmp(t);
+ let translated=0;
+ const ai={call:async(prompt,input)=>{
+   translated++;assert.match(prompt,/Thai/);
+   assert.match(prompt,/read-only/);
+   assert.equal(JSON.parse(input[0].content[0].text).source_text,'မင်္ဂလာပါ');
+   return 'สวัสดี';
+ }};
+ const bot=new Worker({group:G,enabled:true,dir},store,{},ai,{});
+ const evt=group('200050','@WM /translate th: မင်္ဂလာပါ');
+ store.enqueue([evt]);await bot.process(store.next());
+ const answer=store.db.prepare('SELECT text FROM outgoing WHERE id=?').get(evt.webhookEventId).text;
+ assert.equal(translated,1);
+ assert.equal(answer,'สวัสดี');
+ assert.equal(store.db.prepare('SELECT count(*) n FROM records').get().n,0);
+ const empty=group('200051','@WM /translate en');
+ store.enqueue([empty]);await bot.process(store.next());
+ assert.match(store.db.prepare('SELECT text FROM outgoing WHERE id=?').get(empty.webhookEventId).text,/provide|include/);
+ assert.equal(translated,1);
 });
 test('LINE text splitter preserves full multilingual message and does not silently truncate',()=>{
  const original='မြန်မာ\n'+'စာသား၊ '.repeat(950)+'\nไทย\n'+'ข้อความ '.repeat(890)+'\nEnglish\n'+'reference '.repeat(850);
