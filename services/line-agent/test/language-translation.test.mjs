@@ -175,6 +175,50 @@ test('LINE mentioned direct translation is read-only and respects the requested 
  assert.match(store.db.prepare('SELECT text FROM outgoing WHERE id=?').get(empty.webhookEventId).text,/provide|include/);
  assert.equal(translated,1);
 });
+
+test('Screenshot-style full Burmese CVAS manual text is detected as translation rather than a knowledge lookup',()=>{
+ const longBurmese='မူလ ၃ manual အရ NIR/NIR Plus နှင့် wet chemistry ကို ပိုမိုဆိုင်ရာ sample handling လမ်းညွှန်ချက်များ ပြန်ရှင်းပြထားပါတယ်။\n'+
+ '1. NIR-only sample များကို Sample Manager ထဲတွင် NIR package အဖြစ် log လုပ်ပြီး NIR data ကို မှတ်တမ်းတင်ပါ။\n'+
+ '2. Wet chemistry sample များအတွက် sample sheet ကို verify လုပ်ပြီး shipping notice/email ပို့ရပါသည်။\n'+
+ '3. Manual ရဲ့ “Whenever you ship samples to CVAS, always retain a representative portion” ကို သိမ်းဆည်းပါ။\n'+
+ '4. Sample Manager ထဲမှာ NIR account နှင့် CHM account များ အသုံးပြုရမည်။\n'+
+ '5. Lab မှာ wet chemistry သို့ပို့သည့် sample ကို batch sheet/ID/test information နှင့် မှတ်တမ်းတင်ရမည်။';
+ const prompt='can you translate this all to English : '+longBurmese;
+ assert.deepEqual(directTranslationRequest(prompt),{target:'en',source:longBurmese});
+ assert.deepEqual(directTranslationRequest('Can you please translate the following text into Thai:\n'+longBurmese),
+   {target:'th',source:longBurmese});
+ assert.equal(directTranslationRequest('Tell me about the CVAS manual NIR and wet chemistry'),null);
+ assert.equal(pastBurmeseTranslationRequest(prompt),false);
+});
+test('LINE screenshot double mention + natural request reaches translator instead of CVAS/manual',async t=>{
+ const {store,dir}=tmp(t);
+ let calls=0,lookup=0,sourceLength=0;
+ const userContent='မူလ ၃ manual အရ NIR/NIR Plus နှင့် wet chemistry sample handling နည်းလမ်းများကို ရှင်းပြပါ။\n'+
+    '1. NIR-only sample ကို Sample Manager တွင် log လုပ်ပါ။\n'+
+    '2. Wet chemistry sample sheet ကို verify လုပ်ပါ။\n'+
+    '3. Whenever you ship samples to CVAS, always retain a representative portion.\n'+
+    '4. Sample Manager NIR account နှင့် CHM account ကိုခွဲထားပါ။\n'+
+    '5. Lab သို့ပို့သော sample ကို batch sheet/ID/test information ထည့်ထားပါ။';
+ const ai={call:async(prompt,input)=>{
+  calls++;
+  assert.match(prompt,/Translate the source text faithfully into English/);
+  assert.match(prompt,/read-only/);
+  const original=JSON.parse(input[0].content[0].text).source_text;
+  assert.equal(original,userContent);sourceLength=original.length;
+  return 'The original CVAS manual provides instructions for sample handling and NIR/wet chemistry workflows.';
+ }};
+ const bot=new Worker({dir,group:G,cvasIndex:'configured',enabled:true},store,{cvasIndex:async()=>{lookup++;throw Error('Manual lookup is wrong route');}},ai,{});
+ const name='@ARGO-WM Farm AIRobot';
+ const text=name+' '+name+' can you translate this all to English : '+userContent;
+ const evt=group('200070',text,Date.now(),{mention:{mentionees:[{index:0,length:name.length,isSelf:true}]}});
+ store.enqueue([evt]);await bot.process(store.next());
+ const output=store.db.prepare('SELECT text FROM outgoing WHERE id=?').get(evt.webhookEventId)?.text;
+ assert.match(output,/original CVAS manual/i);
+ assert.equal(lookup,0);
+ assert.equal(calls,1);
+ assert(sourceLength>300);
+ assert.equal(store.db.prepare('SELECT COUNT(*) n FROM records').get().n,0);
+});
 test('LINE text splitter preserves full multilingual message and does not silently truncate',()=>{
  const original='မြန်မာ\n'+'စာသား၊ '.repeat(950)+'\nไทย\n'+'ข้อความ '.repeat(890)+'\nEnglish\n'+'reference '.repeat(850);
  const pieces=splitLineText(original);
