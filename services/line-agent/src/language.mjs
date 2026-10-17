@@ -46,7 +46,10 @@ export function directTranslationRequest(value) {
  }
  // Explicit sentence + colon/newline separates instructions from quoted source.
  // Do not translate guessed text embedded in a question without a separator.
- const intro=q.match(/^(?:please\s+)?translate\s+(?:this\s+)?(?:(?:burmese|myanmar|thai|english)\s+)?(?:text|message|sentence|paragraph)?\s*(?:to|into)\s+(english|en|myanmar|burmese|my|thai|th)(?:\s+(?:language|please))?\s*[:：\n]\s*([\s\S]*)$/i);
+ // Natural requests need an explicit destination and source delimiter. Match
+ // "Can you translate this all to English: ..." without routing the embedded
+ // word "manual" or "NIR" to the CVAS manual handler.
+ const intro=q.match(/^(?:(?:can|could|would)\s+you\s+(?:please\s+)?|please\s+)?translate\s+(?:(?:this\s+all|all\s+(?:of\s+)?this|the\s+following|the\s+entire|the\s+whole|this|all|everything)\s+)?(?:(?:burmese|myanmar|thai|english)\s+)?(?:text|message|sentence|paragraph)?\s*(?:to|into)\s+(english|en|myanmar|burmese|my|thai|th)(?:\s+(?:language|please))?\s*[:：\n]\s*([\s\S]*)$/i);
  if(intro){
   const v=intro[1].toLowerCase(),target=({en:'en',english:'en',my:'my',burmese:'my',myanmar:'my',th:'th',thai:'th'})[v];
   return {target,source:intro[2].trim()};
