@@ -21,6 +21,9 @@ export function infoIntent(text) {
  return null;
 }
 export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=false}={}) {
+ if(language==='tri')return ['မြန်မာ\n'+infoAnswer(intent,'my',{privateLab,labConfigured}),
+  'ไทย\n'+infoAnswer(intent,'th',{privateLab,labConfigured}),
+  'English\n'+infoAnswer(intent,'en',{privateLab,labConfigured})].join('\n\n');
  const say=(en,my,th)=>pick(language,en,my,th);
  const e=RELEASE_EVIDENCE;
  const stamp=say('Verified feature baseline','အတည်ပြုထားသော မူလလုပ်ဆောင်ချက်များ','ข้อมูลอ้างอิงความสามารถที่ตรวจสอบแล้ว')+`: ${e.checkedAt}; ${e.deployed.commit} (${e.deployed.date}).`;
