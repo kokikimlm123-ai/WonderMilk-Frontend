@@ -85,5 +85,7 @@ export function infoAnswer(intent,language='en',{privateLab=false,labConfigured=
  'မေးခွန်းတစ်ခုကို ဘာသာစကား ၃ မျိုးဖြင့် ဖြေစေလိုပါက "Answer Myanmar, Thai & English" ဟု ထည့်ရေးပါ။ မြန်မာ၊ ထိုင်း၊ အင်္ဂလိပ် အစီအစဉ်အတိုင်း ဖြေပါမည်။ ရှည်သောအဖြေများကို LINE Message အများအပြားခွဲပို့နိုင်ပါသည်။',
  'หากต้องการคำตอบ 3 ภาษา ให้เพิ่ม "Answer Myanmar, Thai & English" ในคำถาม ระบบจะตอบตามลำดับ พม่า ไทย อังกฤษ และอาจแบ่งข้อความที่ยาวเป็นหลายข้อความใน LINE'));
  lines.push(say('I respond in Myanmar, English or Thai to match your message.','မေးထားသောဘာသာစကားအလိုက် မြန်မာ၊ အင်္ဂလိပ်၊ ထိုင်းဘာသာဖြင့် ပြန်ဖြေပါသည်။','ตอบเป็นภาษาเมียนมา อังกฤษ หรือไทยตามภาษาที่คุณใช้'));
+ lines.push(language==='my'?'/image <Lab ID သို့မဟုတ် ဖိုင်အမည်> page 1 — မူရင်းစာမျက်နှာပုံ။ /image list — ဖိုင်စာရင်း။':language==='th'?'/image <Lab ID หรือชื่อไฟล์> page 1 — ภาพหน้าต้นฉบับ /image list — รายการไฟล์':'/image <Lab ID or filename> page 1 — original page image. /image list — available files.');
  return lines.join('\n\n');
 }
+

@@ -1,3 +1,7 @@
+import {fileCatalog} from './file-images.mjs';
+import {rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {randomBytes} from 'node:crypto';
 import {validateIndex,answerCvas} from './cvas.mjs';
 import {privateLabEvent} from './lab-access.mjs';
 import {createServer} from 'node:http';
@@ -8,10 +12,14 @@ import {AI,Google,Line} from './integrations.mjs';
 import {Worker} from './worker.mjs';
 
 function send(res,status,data){res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});res.end(JSON.stringify(data));}
-export function createApp(c,store,manualImages=null) {
+export function createApp(c,store,manualImages=null,fileImages=null) {
   const server=createServer(async(req,res)=>{
     try {
       const path=new URL(req.url,'http://localhost').pathname;
+      if(path.startsWith('/media/files/')) {
+        if(fileImages)return await fileImages.serve(req,res,path);
+        return send(res,404,{error:'not_found'});
+      }
       if(path.startsWith('/media/manual/')) {
         if(manualImages)return await manualImages.serve(req,res,path);
         return send(res,404,{error:'not_found'});
@@ -70,9 +78,23 @@ export function start() {
     }
   }).catch(()=>console.error("cvas_source_unavailable"));
   worker.manualImages.render(29).then(images=>console.log(JSON.stringify({manual_images:'ready',printed_page:29,pdf_viewer_page:30,original_bytes:images.original.length,preview_bytes:images.preview.length}))).catch(e=>console.error(JSON.stringify({manual_images:'warmup_failed',reason:['Exactly one CVAS source manual required','Private manual source missing','Manual version mismatch','Invalid rendered image'].includes(e.message)?e.message:'source_or_renderer',service:e.service,status:e.status,code:e.code,source_account:(()=>{try{return JSON.parse(c.googleJSON).client_email;}catch{return undefined;}})()})));
-  const server=createApp(c,store,worker.manualImages),timer=setInterval(()=>worker.tick().catch(()=>console.error('worker_error')),1000);
+  if(c.cvasIndex)google.cvasIndex().then(async index=>{
+    const catalog=fileCatalog(index,c,true);
+    console.log(JSON.stringify({file_image_catalog:catalog.length,linked:catalog.filter(f=>f.id).length,unlinked:catalog.filter(f=>!f.id).map(f=>f.name)}));
+    const samples=[catalog.find(f=>f.aliases.includes('39170011')),...catalog.filter(f=>f.aliases.some(a=>['dairy-nutrition-walter-chen','milk-quality-mastitis-todd-meyer','forage-analysis-interpretation-precision-feed-manager'].includes(a)))].filter(Boolean);
+    // Read-only checks: render locally, delete immediately, never message LINE.
+    for(const source of samples){
+      const key='file_images_smoke_v1:'+source.id;if(store.setting(key)==='passed')continue;
+      const ticket=randomBytes(32).toString('hex');
+      try{const result=await worker.fileImages.render(source,1,ticket);store.set(key,'passed');console.log(JSON.stringify({file_images:'ready',sample:source.name,pages:result.pages}));}
+      catch(e){console.error(JSON.stringify({file_images:'smoke_failed',sample:source.name,status:e.status,code:e.code}));}
+      finally{await rm(join(worker.fileImages.cache,ticket),{recursive:true,force:true});}
+    }
+  }).catch(()=>console.error('file_image_catalog_unavailable'));
+  const server=createApp(c,store,worker.manualImages,worker.fileImages),timer=setInterval(()=>worker.tick().catch(()=>console.error('worker_error')),1000);
   server.listen(c.port,'0.0.0.0',()=>console.log(JSON.stringify({status:'listening',port:c.port,enabled:c.enabled,missing:missingConfiguration(c)})));
   const stop=()=>{clearInterval(timer);server.close();const end=setInterval(()=>{if(!worker.running){clearInterval(end);store.close();process.exit(0);}},100);setTimeout(()=>process.exit(1),55000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)start();
+

@@ -9,6 +9,7 @@ export const MANUAL_SHA='b7e674e1bbce9af057406c36b982591f81e73f6e9c5a05ffce8e1a1
 export const digest=b=>createHash('sha256').update(b).digest('hex');
 export function manualImageRequest(text) {
  const q=String(text??'').normalize('NFKC').replace(/[၀-၉๐-๙]/g,c=>String(c.charCodeAt(0)-(c>='၀'&&c<='၉'?0x1040:0x0e50))).trim();
+ if(/^\/(?:image|fileimage)(?:\s|$)/i.test(q)||(/\b(?:report|lab|nutrition|mastitis|forage)\b|\d{8}/i.test(q)&&!/^\/manual\b/i.test(q)))return null;
  const command=/^\/manual(?:\s|$)/i.test(q);
  const pageWord=/\bpages?\b|စာမျက်နှာ|หน้า/i.test(q);
  const imageWord=/\b(?:photos?|images?|pictures?|screenshots?)\b|ပုံ|ဓာတ်ပုံ|รูป|ภาพ/i.test(q);
@@ -120,3 +121,4 @@ export class ManualImages {
   }catch{deny();}
  }
 }
+

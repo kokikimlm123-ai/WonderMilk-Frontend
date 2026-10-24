@@ -105,6 +105,18 @@ export class Google {
     const merged={...data,manuals};
     this.cvasCached={at:Date.now(),data:merged};return merged;
   }
+  async imageSource(id) {
+    if(!/^[A-Za-z0-9_-]+$/.test(id))throw Error('Invalid source ID');
+    const headers={authorization:`Bearer ${await this.token()}`};
+    const base=`https://www.googleapis.com/drive/v3/files/${id}`;
+    const meta=await json(base+'?fields=id,name,mimeType,size&supportsAllDrives=true',{headers});
+    if(Number(meta.size)>50*1024*1024)throw Error('Source exceeds 50 MB');
+    const native=['application/vnd.google-apps.spreadsheet','application/vnd.google-apps.presentation','application/vnd.google-apps.document'].includes(meta.mimeType);
+    const types={'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'xlsx','application/vnd.ms-excel':'xls','application/vnd.openxmlformats-officedocument.presentationml.presentation':'pptx','application/vnd.ms-powerpoint':'ppt','application/vnd.openxmlformats-officedocument.wordprocessingml.document':'docx','application/msword':'doc','application/vnd.oasis.opendocument.spreadsheet':'ods','application/vnd.oasis.opendocument.presentation':'odp','application/vnd.oasis.opendocument.text':'odt'};
+    const ext=native?'pdf':types[meta.mimeType];if(!ext)throw Error('Unsupported source type');
+    const {bytes}=await response(base+(native?'/export?mimeType=application%2Fpdf':'?alt=media&supportsAllDrives=true'),{headers},50*1024*1024);
+    return {bytes,ext,name:meta.name};
+  }
   async manualPdf() {
     const index=await this.cvasIndex();
     const manuals=(index.manuals||[]).filter(m=>/CVAS.*Manual|Manual.*CVAS/i.test(m.title||''));
@@ -236,3 +248,4 @@ export class Line {
     if(!res.ok&&res.status!==409)throw new RemoteError('LINE push',res.status);
   }
 }
+
