@@ -1,6 +1,6 @@
 import {languageInstruction} from './language.mjs';
 import {manualRequest,nutritionRequest,answerManual} from './manual.mjs';
-export function cvasRequest(text) { return manualRequest(text)||nutritionRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก|玉米青贮|化验报告|实验室报告|检测报告|饲料检测/i.test(text); }
+export function cvasRequest(text) { return labCountRequest(text)||manualRequest(text)||nutritionRequest(text)||/^\/cvas(?:\s|$)/i.test(text)||/\bcvas\b|\bpdfs?\b|\blab report\b|\bCS\b|corn silage|ပြောင်းဖူးနှပ်|ข้าวโพดหมัก|玉米青贮|化验报告|实验室报告|检测报告|饲料检测/i.test(text); }
 export function validateIndex(data) {
  if(data?.schema_version!==1||!Array.isArray(data.reports)||data.reports.length>1000)throw new Error('Invalid CVAS index');
  const keys=new Set();
@@ -12,6 +12,7 @@ export function validateIndex(data) {
 }
 export async function answerCvas(index,question,ai,language) {
  validateIndex(index);
+ if(labCountRequest(question))return countSamples(index,question,ai,language);
  if(manualRequest(question))return answerManual(index,question,ai,language);
  if(/best|worst|rank|အကောင်းဆုံး|အဆိုးဆုံး|ดีที่สุด|แย่ที่สุด|最好|最差|排名|比较/i.test(question))return rankSamples(index,question,ai,language);
  if(/\bpdfs?\b/i.test(question))return searchPdfs(index,question,ai,language);
@@ -115,4 +116,30 @@ export function rankingScope(question) {
  // constraints remain in the filter request and cannot accidentally broaden scope.
  const remainder=filterQuestion.replace(/\/cvas|@wm|\b(cvas|cs|corn silage|sample[s]?|report[s]?|pdf[s]?|find|show|send|me|please|the|all|of|which|is|one|and|explain|why)\b|ကို|ရှာပေးပါ|ရှာပေစပါ|ရှာပါ|ပေးပါ|ပြပါ|နမူနာ|အားလုံး|ทั้งหมด|ตัวอย่าง|ข้าวโพดหมัก|หา|ให้|หน่อย/gi,'').replace(/[\s.,!?။]+/g,'');
  return {simpleCS:/\bCS\b|corn silage|ข้าวโพดหมัก/i.test(question)&&!remainder,filterQuestion};
+}
+
+
+// Aggregate measured reports before reference/manual routing. A negated mention
+// of "manual" must not override a request to count actual laboratory samples.
+export function labCountRequest(text){
+ return !/^\/(?:manual|forage|nutrition)\b/i.test(text)&&/how many|count|ဘယ်နှ|အရေအတွက်|กี่|จำนวน|多少|数量/i.test(text)&&/\bDM\b|dry matter/i.test(text)&&/starch/i.test(text);
+}
+export async function countSamples(index,question,ai,language){
+ const dm=question.match(/(?:\bDM|dry matter)\s*%?\s*(>=|<=|>|<)\s*(\d+(?:\.\d+)?)\s*%?/i);
+ const starch=question.match(/starch\s*%?\s*(>=|<=|>|<)\s*(\d+(?:\.\d+)?)\s*%?/i);
+ if(!dm||!starch||/\bor\b/i.test(question)||[dm,starch].some(m=>Number(m[2])>100))return 'Please specify both thresholds joined by AND, for example DM > 30% AND Starch > 30%. Starch uses the %DM column.';
+ const found=await findReports(index,question+' [Scope clarification: count across the entire catalog when no sample type, farm, country, date or Lab ID restriction was requested. Preserve every explicit restriction. Numeric DM/starch conditions are applied after scope filtering.]',ai,language);
+ if(found.clarification)return found.clarification;
+ const byId=new Map();let noId=0;
+ for(const r of found.reports){if(!r.lab_id){noId++;continue;}const versions=byId.get(r.lab_id)||[];versions.push(r);byId.set(r.lab_id,versions);}
+ const compare=(v,m)=>m[1]==='>'?v>+m[2]:m[1]==='>='?v>=+m[2]:m[1]==='<'?v<+m[2]:v<=+m[2];
+ let missing=0,conflict=0;const matches=[];
+ for(const [id,versions] of byId){
+  const metrics=versions.map(qualityMetrics);
+  if(metrics.some(m=>!Number.isFinite(m.DM_percent)||!Number.isFinite(m.starch_percent_DM))){missing++;continue;}
+  if(new Set(metrics.map(m=>JSON.stringify([m.DM_percent,m.starch_percent_DM]))).size!==1){conflict++;continue;}
+  const m=metrics[0];if(compare(m.DM_percent,dm)&&compare(m.starch_percent_DM,starch))matches.push({id,name:versions[0].filenames[0],dm:m.DM_percent,starch:m.starch_percent_DM});
+ }
+ const title=({my:'ကိုက်ညီသော နမူနာအရေအတွက်',th:'จำนวนตัวอย่างที่ตรงเงื่อนไข',zh:'符合条件的样品数'}[language]||'Matching unique samples');
+ return `${title}: ${matches.length}\nDM ${dm[1]} ${dm[2]}%; Starch ${starch[1]} ${starch[2]}% DM (AND)\nSource: stored CVAS report index${index.indexed_on?' — '+index.indexed_on:''}\nScoped unique Lab IDs: ${byId.size}; PDF versions: ${found.reports.length}\nExcluded: missing/unrecognized values ${missing}; conflicting versions ${conflict}; missing Lab ID ${noId}.\nIdentical DM/starch versions counted once per Lab ID.\n\n`+matches.slice(0,40).map(m=>`${m.id} | ${m.name} | DM ${m.dm}% | Starch ${m.starch}% DM`).join('\n')+(matches.length>40?`\nShowing 40 of ${matches.length} matches; total includes all matches.`:'');
 }

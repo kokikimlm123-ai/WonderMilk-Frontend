@@ -58,3 +58,22 @@ test('ranking scope retains farm and date restrictions for filtering',async()=>{
  const ai={call:async(prompt,input)=>{const q=JSON.parse(input[0].content[0].text).question;assert.doesNotMatch(q,/best/i);assert.match(q,/RKS 260723/);return {groups:[['CS'],['RKS'],['260723']],all:false,clarification:''};},answer:async(q,e)=>{assert.equal(e.matched_report_versions,39);return 'ok';}};
  assert.equal(await answerCvas({schema_version:1,reports},'best CS RKS 260723',ai,'en'),'ok');
 });
+
+
+import {labCountRequest} from '../src/cvas.mjs';
+test('threshold count bypasses manual and counts all unique IDs with strict bounds',async()=>{
+ const row=(a,b='')=>a.padEnd(68)+b;
+ const report=(id,dm,starch,n)=>({sha256:n.toString(16).padStart(64,'0'),lab_id:id,filenames:[id+'-CS.pdf'],text:[row('SAMPLE INFORMATION','MINERALS'),row('Dry Matter '+dm),row('Starch '+starch)].join('\n')});
+ const data={schema_version:1,reports:[report('39170001',35,32,1),report('39170001',35,32,2),report('39170002',30,31,3),report('39170003',35,'',4),report('39170004',35,35,5),report('39170004',35,20,6)]};
+ let calls=0;const ai={call:async(prompt)=>{calls++;assert.match(prompt,/scope extraction/);return {groups:[],all:true,clarification:''};},answer:async()=>{throw Error('must count deterministically');}};
+ for(const q of ['How many Lab report samples match DM>30% and starch>30%','Search the stored CVAS lab-report database, not the CVAS Manual. Count unique sample IDs where Dry Matter > 30% AND Starch > 30%.']){
+  assert.equal(labCountRequest(q),true);const answer=await answerCvas(data,q,ai,'en');assert.match(answer,/Matching unique samples: 1/);assert.match(answer,/missing\/unrecognized values 1; conflicting versions 1/);assert.match(answer,/39170001/);assert.doesNotMatch(answer,/PDF p\./);
+ }
+ assert.equal(calls,2);assert.equal(labCountRequest('/manual how many samples DM starch'),false);
+ const inclusive=await answerCvas(data,'count DM>=30 and starch>30',ai,'en');assert.match(inclusive,/Matching unique samples: 2/);
+});
+test('threshold count preserves requested scope and missing values are never zero',async()=>{
+ const ai={call:async()=>({groups:[['UNKNOWN']],all:false,clarification:''})};
+ assert.match(await answerCvas({schema_version:1,reports},'count UNKNOWN samples DM>30 and starch>30',ai,'en'),/Matching unique samples: 0/);
+ assert.match(await answerCvas(index,'count DM>30 OR starch>30',{},'en'),/Please specify/);
+});
